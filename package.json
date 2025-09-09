@@ -1,0 +1,22 @@
+{
+  "name": "mail_service",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@google-cloud/pubsub": "^5.2.0",
+    "body-parser": "^2.2.0",
+    "cheerio": "^1.1.0",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "googleapis": "^159.0.0"
+  },
+  "type": "module"
+}
