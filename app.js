@@ -24,7 +24,7 @@ function createOAuthClient(user,tokens) {
   const client = new google.auth.OAuth2(
     process.env.CLIENT_ID,
     process.env.CLIENT_SECRET,
-    `http://${host}:${port}/oauth2callback`
+    `https://${host}:${port}/oauth2callback`
   );
   client.setCredentials(tokens);
     // Auto-refresh listener
@@ -244,7 +244,7 @@ app.get("/startSub", async (req,res) => {
 })
 
 app.listen(port, () => {
-  console.log(`Server running on http://${host}:${port}`);
+  console.log(`Server running on https://${host}:${port}`);
 });
 
 async function sendToDb(transaction,user_id) {
