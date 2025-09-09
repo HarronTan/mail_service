@@ -3,7 +3,10 @@ import { google } from "googleapis";
 import bodyParser from "body-parser";
 import "dotenv/config";
 import { PubSub } from "@google-cloud/pubsub";
-import serviceAccount from "./service-account.json" assert { type: "json" };
+ 
+import { readFileSync } from "fs";
+
+const serviceAccount = JSON.parse(readFileSync(new URL("./service-account.json", import.meta.url)));
 
 const app = express();
 app.use(bodyParser.json());
@@ -14,7 +17,7 @@ const host = process.env.HOST
 const oAuth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
-  `http://${host}:${port}/oauth2callback`
+  `https://${host}:${port}/oauth2callback`
 );
 
 function createOAuthClient(user,tokens) {
