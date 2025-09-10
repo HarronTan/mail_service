@@ -43,6 +43,11 @@ function createOAuthClient(user,tokens) {
 
 const userState = new Map()
 const userLastHistoryId = new Map()
+
+app.get("/healthcheck", (req, res) => {
+  res.status(200).send();
+});
+
 // Step 1: Generate Auth URL
 app.get("/auth", (req, res) => {
   const { userId } = req.query;
