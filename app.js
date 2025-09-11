@@ -18,14 +18,14 @@ const PROTOCOL = process.env.PROTOCOL
 const oAuth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
-  `${PROTOCOL}://${host}:${port}/oauth2callback`
+  `${PROTOCOL}://${host}/oauth2callback`
 );
 
 function createOAuthClient(user,tokens) {
   const client = new google.auth.OAuth2(
     process.env.CLIENT_ID,
     process.env.CLIENT_SECRET,
-    `${PROTOCOL}://${host}:${port}/oauth2callback`
+    `${PROTOCOL}://${host}/oauth2callback`
   );
   client.setCredentials(tokens);
     // Auto-refresh listener
