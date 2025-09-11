@@ -13,18 +13,19 @@ app.use(bodyParser.json());
 
 const port = process.env.PORT
 const host = process.env.HOST
+const PROTOCOL = process.env.PROTOCOL
 
 const oAuth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
-  `https://${host}/oauth2callback`
+  `${PROTOCOL}://${host}:${port}/oauth2callback`
 );
 
 function createOAuthClient(user,tokens) {
   const client = new google.auth.OAuth2(
     process.env.CLIENT_ID,
     process.env.CLIENT_SECRET,
-    `https://${host}/oauth2callback`
+    `${PROTOCOL}://${host}:${port}/oauth2callback`
   );
   client.setCredentials(tokens);
     // Auto-refresh listener
@@ -178,7 +179,7 @@ app.get("/startSub", async (req,res) => {
     }
 
     const historyRes = await gmail.users.history.list({
-      userId: userEmail,
+      userId: 'me',
       startHistoryId: lastHistoryId,
     });
 
@@ -187,16 +188,18 @@ app.get("/startSub", async (req,res) => {
       if (record.messagesAdded) {
         for (const added of record.messagesAdded) {
           const messageId = added.message.id;
-          const message = await gmail.users.messages.get({
-            userId: userEmail,
-            id: messageId,
-          });
 
-          const snippet = message.data.snippet;
-          const internalDate = parseInt(message.data.internalDate);
+          try{
+            const message = await gmail.users.messages.get({
+              userId: 'me',
+              id: messageId,
+            });
+            
+            const snippet = message.data.snippet;
+            const internalDate = parseInt(message.data.internalDate);
 
-          // Only process if received AFTER we started
-          if (internalDate > Date.now() - 60 * 1000) {
+            // Only process if received AFTER we started
+            if (internalDate > Date.now() - 60 * 1000) {
             
             const rawBody = getBody(message.data.payload);
             const cleanText = /<[^>]+>/.test(rawBody) ? htmlToText(rawBody) : rawBody;
@@ -229,6 +232,12 @@ app.get("/startSub", async (req,res) => {
               await sendToDb(bodyPayload,userID)
             } 
           }
+
+          } catch(error) {
+            console.error(error)
+
+          }
+          
         }
       }
     }
@@ -249,14 +258,38 @@ app.get("/startSub", async (req,res) => {
 })
 
 app.listen(port, () => {
-  console.log(`Server running on https://${host}:${port}`);
+  console.log(`Server running on ${PROTOCOL}://${host}:${port}`);
 });
+
+
+function detectCategory(description) {
+  if (!description) return "Others";
+
+  const categoryMap = {
+    "PARKING.SG": "Transport",
+    "GRAB": "Transport",
+    "COMFORT": "Transport",
+    "MRT": "Transport",
+    "BUS": "Transport",
+  };
+
+  const upperDesc = description.toUpperCase();
+
+  for (const [keyword, category] of Object.entries(categoryMap)) {
+    if (upperDesc.includes(keyword)) {
+      return category;
+    }
+  }
+
+  return "Food"; // fallback
+}
+
 
 async function sendToDb(transaction,user_id) {
   
   const amount = Number(transaction.amount)
   const description = transaction.description
-  const category_name = "Others"
+  const category_name = detectCategory(description)
 
 
   const response = await fetch('https://doqgomabmxpcijxoliff.supabase.co/functions/v1/add-expense', {
