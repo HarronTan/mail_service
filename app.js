@@ -86,7 +86,8 @@ app.get("/start-watch/:userId", async (req, res) => {
       labelIds: ["INBOX"], // optional: only watch inbox
     },
   });
-
+  const data =response.data
+  userLastHistoryId.set(req.params.userId, data.historyId);
   res.json(response.data);
 });
 
