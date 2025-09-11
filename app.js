@@ -114,7 +114,7 @@ app.get("/startSub", async (req,res) => {
       const lastHistoryId = userLastHistoryId.get(user)
 
       if (!lastHistoryId) {
-        setLastHistory(data,gmail)
+        setLastHistory(data,gmail,user)
         return;
       }
 
@@ -194,7 +194,7 @@ app.listen(port, () => {
   console.log(`Server running on ${PROTOCOL}://${host}:${port}`);
 });
 
-async function setLastHistory(data,gmail) {
+async function setLastHistory(data,gmail,user) {
     // Initialize from the previous historyId
   const startHistoryId = String(Number(data.historyId) - 1);
 
