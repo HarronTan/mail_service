@@ -76,7 +76,7 @@ app.get("/oauth2callback", async (req, res) => {
 
 app.get("/start-watch/:userId", async (req, res) => {
   const tokens = userState.get(req.params.userId)
-  const auth = createOAuthClient(tokens,tokens)
+  const auth = createOAuthClient(req.params.userId,tokens)
   const gmail = google.gmail({ version: "v1", auth });
 
   const response = await gmail.users.watch({
@@ -133,7 +133,7 @@ app.get("/startSub", async (req,res) => {
               const message = await gmail.users.messages.get({
                 userId: 'me',
                 id: messageId,
-              });
+              }).catch(()=> {throw(messageId)});
               
               const snippet = message.data.snippet;
               const internalDate = parseInt(message.data.internalDate);
