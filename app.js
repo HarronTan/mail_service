@@ -1,3 +1,4 @@
+"use strict";
 import express from "express";
 import { google } from "googleapis";
 import bodyParser from "body-parser";
@@ -144,9 +145,9 @@ app.get("/startSub", async (req,res) => {
               const rawBody = getBody(message.data.payload);
               const cleanText = /<[^>]+>/.test(rawBody) ? htmlToText(rawBody) : rawBody;
 
+              // Pattern 1: OCBC Paynow
               const regex = /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s;
               const match = cleanText.match(regex);
-
 
               if(match) {
                 const bodyPayload = {
@@ -158,6 +159,7 @@ app.get("/startSub", async (req,res) => {
                 await sendToDb(bodyPayload,userID)
               }
 
+              // Pattern 2: SB CC
               const regex2 = /\+SGD\s*([\d,]+\.\d{2}).*?at\s+(.+?)\s*(?:-|)\s*\./s;
               const match2 = cleanText.match(regex2);
               if (match2) {
@@ -171,6 +173,21 @@ app.get("/startSub", async (req,res) => {
                 }
                 await sendToDb(bodyPayload,userID)
               } 
+
+              // Pattern 3: DBS Paynow/CC
+              const regex3 = /Amount:\s*SGD([\d,]+\.\d{2})[\s\S]*?To:\s*(.+)/s;
+              const match3 = cleanText.match(regex3);
+
+              if (match3) {
+                const bodyPayload = {
+                  snippet,
+                  rawText: cleanText.slice(0, 200),
+                  amount: match3[1].trim(),
+                  description: match3[2].trim(),
+                };
+                await sendToDb(bodyPayload, userID);
+              }
+
             }
           }
         }
@@ -309,3 +326,10 @@ function htmlToText(html) {
   const $ = cheerio.load(html);
   return $("body").text().replace(/\s+/g, " ").trim(); // collapse whitespace
 }
+
+
+// Public Key:
+// BFZCCk2MDWDERbt0vU3crNx3e0Zdva82IA8Ko4pyWTPHNFskUqaP--FIeTcgbYq-h7K4KJgM1cjfZ7WZIhkdtKk
+
+// Private Key:
+// 9N_EYvF8f0En9aS3N0gpLxruRVZ3rlZM8jUMlcEb9Ag
