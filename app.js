@@ -124,7 +124,7 @@ app.get("/startSub", async (req,res) => {
         userId: 'me',
         startHistoryId: lastHistoryId,
       });
-
+      userLastHistoryId.set(user,data.historyId)
       const history = historyRes.data.history || [];
       for (const record of history) {
         if (record.messagesAdded) {
@@ -192,8 +192,6 @@ app.get("/startSub", async (req,res) => {
           }
         }
       }
-
-      userLastHistoryId.set(user,data.historyId)
 
       msg.ack();
       } catch (err) {
