@@ -174,8 +174,8 @@ app.get("/startSub", async (req,res) => {
                 await sendToDb(bodyPayload,userID)
               } 
 
-              // Pattern 3: DBS Paynow/CC
-              const regex3 = /Amount:\s*SGD([\d,]+\.\d{2})[\s\S]*?To:\s*(.+)/s;
+              // Pattern 3: DBS Paynow/CC && OCBC NETS QR
+              const regex3 = /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+)/s;
               const match3 = cleanText.match(regex3);
 
               if (match3) {
