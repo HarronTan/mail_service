@@ -4,8 +4,19 @@ import { google } from "googleapis";
 import bodyParser from "body-parser";
 import "dotenv/config";
 import { PubSub } from "@google-cloud/pubsub";
- 
 import { readFileSync } from "fs";
+import webPush from "web-push";
+import { createClient } from '@supabase/supabase-js'
+
+webPush.setVapidDetails(
+  "mailto:you@example.com",
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+);
+
+const supabaseUrl = 'https://doqgomabmxpcijxoliff.supabase.co'
+const supabaseKey = process.env.SUPABASE_KEY
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 const serviceAccount = JSON.parse(readFileSync(new URL("./service-account.json", import.meta.url)));
 
@@ -175,7 +186,7 @@ app.get("/startSub", async (req,res) => {
               } 
 
               // Pattern 3: DBS Paynow/CC && OCBC NETS QR
-              const regex3 = /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+)/s;
+              const regex3 = /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+?)(?=\n|if unauthorised)/i;
               const match3 = cleanText.match(regex3);
 
               if (match3) {
@@ -209,6 +220,12 @@ app.get("/startSub", async (req,res) => {
 app.listen(port, () => {
   console.log(`Server running on ${PROTOCOL}://${host}:${port}`);
 });
+
+app.get("/test/send", async (req,res) => {
+  await sendUserNotification("56ab3477-86d3-4814-9ccc-7221ad1398ab", 1.5, "test notification")
+
+  res.status(200).send()
+})
 
 async function setLastHistory(data,gmail,user) {
     // Initialize from the previous historyId
@@ -295,6 +312,8 @@ async function sendToDb(transaction,user_id) {
   console.log(data)
   console.log(`Successfully added data to db!`)
 
+  await sendUserNotification(user_id,amount,description)
+
 }
 
 function getBody(payload) {
@@ -317,12 +336,51 @@ function getBody(payload) {
   return body;
 }
 
-
 import * as cheerio from "cheerio";
 
 function htmlToText(html) {
   const $ = cheerio.load(html);
   return $("body").text().replace(/\s+/g, " ").trim(); // collapse whitespace
+}
+
+
+async function sendUserNotification(userId,amount,desc) {
+  
+  let { data, error } = await supabase
+    .from('push_subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+  console.log(data)
+  
+  if(data.length != 1) return
+
+  data = data[0]
+  const subscription = {
+    endpoint: data.endpoint,
+    keys: {
+      p256dh: data.p256dh,
+      auth: data.auth
+    }
+  }
+
+  const payload = JSON.stringify({
+    title: "Hello my dear",
+    body: `When are you coming home?`,
+    icon: "/icons/notification.png",
+    // url: "https://your-app.com/expenses"
+  });
+
+  await sendNotification(subscription,payload)
+
+}
+
+async function sendNotification(subscription,payload) {
+  try {
+    await webPush.sendNotification(subscription, payload);
+    console.log("✅ Push notification sent!");
+  } catch (err) {
+    console.error("❌ Error sending push:", err);
+  }
 }
 
 
