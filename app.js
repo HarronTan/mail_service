@@ -350,7 +350,6 @@ async function sendUserNotification(userId,amount,desc) {
     .from('push_subscriptions')
     .select('*')
     .eq('user_id', userId)
-  console.log(data)
   
   if(data.length != 1) return
 
@@ -364,8 +363,8 @@ async function sendUserNotification(userId,amount,desc) {
   }
 
   const payload = JSON.stringify({
-    title: "Hello my dear",
-    body: `When are you coming home?`,
+    title: "New Transaction",
+    body: `You spent ${amount} at ${desc}`,
     icon: "/icons/notification.png",
     // url: "https://your-app.com/expenses"
   });
