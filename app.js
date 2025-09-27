@@ -45,7 +45,7 @@ async function getEmailFromAccessToken(access_token) {
   return profile;
 }
 
-function createOAuthClient(userID,tokens) {
+async function createOAuthClient(userID,tokens) {
   const client = new google.auth.OAuth2(
     process.env.CLIENT_ID,
     process.env.CLIENT_SECRET,
@@ -56,6 +56,22 @@ function createOAuthClient(userID,tokens) {
   client.on("tokens", async (newTokens) => {
     await safeUpdateTokens(userID,tokens,newTokens)
   });
+
+  const EXPIRY_MARGIN_MS = 60 * 1000
+  // Check expiry and refresh proactively
+  const expiry = tokens?.expiry_date || 0;
+  if (tokens?.refresh_token && Date.now() >= (expiry - EXPIRY_MARGIN_MS)) {
+    try {
+      const { token } = await client.getAccessToken(); 
+      if (token) {
+        // getAccessToken() internally triggers refresh if needed,
+        // which will emit the "tokens" event we listen to above.
+        console.log("🔄 Access token refreshed for user", userID);
+      }
+    } catch (err) {
+      console.error("❌ Failed to refresh access token for user", userID, err);
+    }
+  }
   return client;
 }
 
@@ -392,7 +408,6 @@ async function startServer() {
       
       for (const record of history) {
         if (record.messagesAdded) {
-          console.log(record.messagesAdded)
           for (const added of record.messagesAdded) {
             const messageId = added.message.id;
 
@@ -403,7 +418,7 @@ async function startServer() {
                 id: messageId,
               });
             } catch (err) {
-              console.error(`Error fetching message ${messageId}:`, err?.response?.data || err);
+              console.error(`Error fetching message ${messageId}`);
               continue; // skip this message and continue with next
             }
 
