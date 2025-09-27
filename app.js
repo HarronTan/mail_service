@@ -7,6 +7,7 @@ import { PubSub } from "@google-cloud/pubsub";
 import { readFileSync } from "fs";
 import webPush from "web-push";
 import { createClient } from '@supabase/supabase-js'
+import * as cheerio from "cheerio";
 
 webPush.setVapidDetails(
   "mailto:you@example.com",
@@ -30,10 +31,21 @@ const PROTOCOL = process.env.PROTOCOL
 const oAuth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
-  `${PROTOCOL}://${host}/oauth2callback`
+  `${PROTOCOL}://${host}:${port}/oauth2callback`
 );
 
-function createOAuthClient(user,tokens) {
+
+async function getEmailFromAccessToken(access_token) {
+  const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { Authorization: `Bearer ${access_token}` },
+  });
+  if (!resp.ok) throw new Error('Failed to fetch userinfo: ' + resp.status);
+  const profile = await resp.json();
+  // profile.email, profile.email_verified, profile.sub, profile.name, profile.picture
+  return profile;
+}
+
+function createOAuthClient(userID,tokens) {
   const client = new google.auth.OAuth2(
     process.env.CLIENT_ID,
     process.env.CLIENT_SECRET,
@@ -49,7 +61,7 @@ function createOAuthClient(user,tokens) {
       tokens.access_token = newTokens.access_token;
       tokens.expiry_date = newTokens.expiry_date;
     }
-    userState.set(user,tokens)
+    await updateOauthToken(userID,tokens)
   });
   return client;
 }
@@ -63,28 +75,50 @@ app.get("/healthcheck", (req, res) => {
 
 // Step 1: Generate Auth URL
 app.get("/auth", (req, res) => {
-  const { userId } = req.query;
   const url = oAuth2Client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent", 
-    scope: ["https://www.googleapis.com/auth/gmail.readonly"],
-    state: userId
+    scope: ["https://www.googleapis.com/auth/gmail.readonly",    
+      "email",
+      "profile"],
   });
   res.redirect(url);
 });
 
 // Step 2: Handle OAuth2 callback
 app.get("/oauth2callback", async (req, res) => {
-  const { code,state } = req.query;
+  const { code } = req.query;
   const { tokens } = await oAuth2Client.getToken(code);
+  const {access_token} = tokens
+  const profile = await getEmailFromAccessToken(access_token)
+  const email = profile.email
 
-  // Store tokens securely (DB, encrypted store)
-  console.log("Tokens acquired:", tokens);
+  //check user in db
+  const user  = await getUser(email)
+  if(user == null) {
+    res.send(`User is not registered.`)
+    return
+  }
 
-  userState.set(state,tokens)
-  res.send(`User ${state} authenticated successfully!`);
+  await updateOauthToken(user.id,tokens)
+
+  const auth = createOAuthClient(user.id,tokens)
+  const gmail = google.gmail({ version: "v1", auth });
+
+  const response = await gmail.users.watch({
+    userId: "me",
+    requestBody: {
+      topicName: "projects/mail-service-470611/topics/gmail-updates",
+      labelIds: ["INBOX"], 
+    },
+  });
+  const data =response.data
+
+  await updateLastHistoryId(user.id,data.historyId ?? "")
+
+  // userState.set(state,tokens)
+  res.send(`User ${email} authenticated successfully!`);
 });
-
 
 app.get("/start-watch/:userId", async (req, res) => {
   const tokens = userState.get(req.params.userId)
@@ -104,121 +138,14 @@ app.get("/start-watch/:userId", async (req, res) => {
 });
 
 app.get("/startSub", async (req,res) => {
-  const pubsub = new PubSub({ projectId: "mail-service-470611", credentials: serviceAccount });
-  const subscription = pubsub.subscription("gmail-updates-sub");
-
-  subscription.on("message", async (msg) => {
-  
-    try {
-      const data = JSON.parse(msg.data.toString());
-      console.log("📩 Gmail update:", data);
-
-      const userEmail = data.emailAddress
-      const userID = userEmail === "harrontan@gmail.com" ? 
-      "56ab3477-86d3-4814-9ccc-7221ad1398ab":
-      "2e20e8b7-967f-423b-9f08-24b620b0b4f7"    
-      
-      const user = userEmail === "harrontan@gmail.com" ? "harron" : "jw"
-      const tokens = userState.get(user)
-      if(!tokens) return
-
-      const auth = createOAuthClient(user,tokens)
-      const gmail = google.gmail({ version: "v1", auth });
-      const lastHistoryId = userLastHistoryId.get(user)
-
-      if (!lastHistoryId) {
-        setLastHistory(data,gmail,user)
-        return;
-      }
-
-      const historyRes = await gmail.users.history.list({
-        userId: 'me',
-        startHistoryId: lastHistoryId,
-      });
-      userLastHistoryId.set(user,data.historyId)
-      const history = historyRes.data.history || [];
-      for (const record of history) {
-        if (record.messagesAdded) {
-          for (const added of record.messagesAdded) {
-            const messageId = added.message.id;
-
-              const message = await gmail.users.messages.get({
-                userId: 'me',
-                id: messageId,
-              }).catch(()=> {throw(messageId)});
-              
-              const snippet = message.data.snippet;
-              const internalDate = parseInt(message.data.internalDate);
-
-              // Only process if received AFTER we started
-              if (internalDate > Date.now() - 60 * 1000) {
-              
-              const rawBody = getBody(message.data.payload);
-              const cleanText = /<[^>]+>/.test(rawBody) ? htmlToText(rawBody) : rawBody;
-
-              // Pattern 1: OCBC Paynow
-              const regex = /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s;
-              const match = cleanText.match(regex);
-
-              if(match) {
-                const bodyPayload = {
-                  snippet: snippet,
-                  rawText: cleanText.slice(0, 200), // preview first 200 chars
-                  amount: match[2] ? match[2].trim() : "Unknown",
-                  description: match[1] ? match[1].trim() : 0,
-                }
-                await sendToDb(bodyPayload,userID)
-              }
-
-              // Pattern 2: SB CC
-              const regex2 = /\+SGD\s*([\d,]+\.\d{2}).*?at\s+(.+?)\s*(?:-|)\s*\./s;
-              const match2 = cleanText.match(regex2);
-              if (match2) {
-                const amount = match2[1].trim();
-                const merchant = match2[2].trim();
-                const bodyPayload = {
-                  snippet: snippet,
-                  rawText: cleanText.slice(0, 200), // preview first 200 chars
-                  amount: amount,
-                  description: merchant,
-                }
-                await sendToDb(bodyPayload,userID)
-              } 
-
-              // Pattern 3: DBS Paynow/CC && OCBC NETS QR
-              const regex3 = /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+?)(?=\n|if unauthorised)/i;
-              const match3 = cleanText.match(regex3);
-
-              if (match3) {
-                const bodyPayload = {
-                  snippet,
-                  rawText: cleanText.slice(0, 200),
-                  amount: match3[1].trim(),
-                  description: match3[2].trim(),
-                };
-                await sendToDb(bodyPayload, userID);
-              }
-
-            }
-          }
-        }
-      }
-
-      msg.ack();
-      } catch (err) {
-      console.error("❌ Error handling message:", err);
-    }
-  });
-
-  subscription.on("error", (err) => {
-    console.error("❌ Subscription error:", err);
-  });
+  startServer()
 
   res.status(200).send();
 })
 
 app.listen(port, () => {
   console.log(`Server running on ${PROTOCOL}://${host}:${port}`);
+  startServer()
 });
 
 app.get("/test/send", async (req,res) => {
@@ -226,41 +153,6 @@ app.get("/test/send", async (req,res) => {
 
   res.status(200).send()
 })
-
-async function setLastHistory(data,gmail,user) {
-    // Initialize from the previous historyId
-  const startHistoryId = String(Number(data.historyId) - 1);
-
-  try {
-    const historyRes = await gmail.users.history.list({
-      userId: 'me', // or userEmail
-      startHistoryId,
-    });
-
-    const history = historyRes.data.history || [];
-    for (const record of history) {
-      if (record.messagesAdded) {
-        for (const added of record.messagesAdded) {
-          const messageId = added.message.id;
-          const message = await gmail.users.messages.get({
-            userId: 'me',
-            id: messageId,
-          });
-
-          console.log("📩 First batch message:", message.data.snippet);
-        }
-      }
-    }
-
-    console.log("📌 Initialized history checkpoint with catch-up:", data.historyId);
-  } catch (err) {
-    console.error("❌ Error fetching initial history:", err);
-  }
-
-  userLastHistoryId.set(user, data.historyId);
-  msg.ack();
-  return;
-}
 
 function detectCategory(description) {
   if (!description) return "Others";
@@ -336,13 +228,10 @@ function getBody(payload) {
   return body;
 }
 
-import * as cheerio from "cheerio";
-
 function htmlToText(html) {
   const $ = cheerio.load(html);
   return $("body").text().replace(/\s+/g, " ").trim(); // collapse whitespace
 }
-
 
 async function sendUserNotification(userId,amount,desc) {
   
@@ -383,8 +272,197 @@ async function sendNotification(subscription,payload) {
 }
 
 
-// Public Key:
-// BFZCCk2MDWDERbt0vU3crNx3e0Zdva82IA8Ko4pyWTPHNFskUqaP--FIeTcgbYq-h7K4KJgM1cjfZ7WZIhkdtKk
+async function getUser(email) {
+  if(email === "jingwenmvp@gmail.com") {
+    email = "jing_wen@live.com"
+  }
+  const { data, error } = await supabase.auth.admin.listUsers({
+    limit: 1000, // optional: max 1000 at a time
+  });
+  
+  if (error) {
+    console.error(error)
+    return null
+  }
 
-// Private Key:
-// 9N_EYvF8f0En9aS3N0gpLxruRVZ3rlZM8jUMlcEb9Ag
+  const user = data.users.find(u => u.email === email);
+
+  if (!user) {
+    console.log("no user found.")
+    null
+  } else {
+    return {
+      id: user.id,
+      email: user.email
+    }
+  }
+}
+
+async function getUserToken(userID) {
+  const { data, error } = await supabase
+    .from("oauth_tokens")
+    .select("*")
+    .eq("user_id", userID)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return null; // no row found
+    throw error;
+  }
+
+  return data;
+}
+
+async function updateOauthToken(user_id,tokens) {
+  await supabase
+  .from("oauth_tokens")
+  .upsert({
+    user_id, 
+    provider: "google",
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    scope: tokens.scope,
+    token_type: tokens.token_type,
+    expiry_date: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+    updated_at: new Date().toISOString(),
+  });
+}
+
+async function getLastHistoryId(userID) {
+  const { data, error } = await supabase
+    .from("last_history_id")
+    .select("history_id")
+    .eq("user_id", userID)
+    .single()
+
+  if (error) {
+    if (error.code === "PGRST116") return null; // no row found
+    throw error;
+  }
+
+  return data.history_id;
+
+}
+async function updateLastHistoryId(user_id,history_id) {
+  await supabase
+  .from("last_history_id")
+  .upsert({
+    user_id, 
+    history_id,
+    updated_at: new Date().toISOString(),
+  }); 
+}
+
+async function startServer() {
+  const pubsub = new PubSub({ projectId: "mail-service-470611", credentials: serviceAccount });
+  const subscription = pubsub.subscription("gmail-updates-sub");
+
+  subscription.on("message", async (msg) => {
+  
+    try {
+      const data = JSON.parse(msg.data.toString());
+      console.log("📩 Gmail update:", data);
+
+      const user  = await getUser(data.emailAddress)
+      if(user == null) return
+      const userID = user.id
+      const tokens = await getUserToken(userID)
+      if(tokens == null) return
+      const auth = createOAuthClient(userID,tokens)
+      
+      const gmail = google.gmail({ version: "v1", auth });
+      const lastHistoryId = await getLastHistoryId(userID)
+      if(lastHistoryId == null) return
+
+      const historyRes = await gmail.users.history.list({
+        userId: 'me',
+        startHistoryId: lastHistoryId,
+      });
+      await updateLastHistoryId(userID,data.historyId)
+
+      const history = historyRes.data.history || [];
+      
+      for (const record of history) {
+        if (record.messagesAdded) {
+          console.log(record.messagesAdded)
+          for (const added of record.messagesAdded) {
+            const messageId = added.message.id;
+
+            let message;
+            try {
+              message = await gmail.users.messages.get({
+                userId: 'me',
+                id: messageId,
+              });
+            } catch (err) {
+              console.error(`Error fetching message ${messageId}:`, err?.response?.data || err);
+              continue; // skip this message and continue with next
+            }
+
+              const snippet = message.data.snippet;
+              const internalDate = parseInt(message.data.internalDate);
+
+              // Only process if received AFTER we started
+              if (internalDate > Date.now() - 60 * 1000) {
+              
+              const rawBody = getBody(message.data.payload);
+              const cleanText = /<[^>]+>/.test(rawBody) ? htmlToText(rawBody) : rawBody;
+
+              // Pattern 1: OCBC Paynow
+              const regex = /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s;
+              const match = cleanText.match(regex);
+
+              if(match) {
+                const bodyPayload = {
+                  snippet: snippet,
+                  rawText: cleanText.slice(0, 200), // preview first 200 chars
+                  amount: match[2] ? match[2].trim() : "Unknown",
+                  description: match[1] ? match[1].trim() : 0,
+                }
+                await sendToDb(bodyPayload,userID)
+              }
+
+              // Pattern 2: SB CC
+              const regex2 = /\+SGD\s*([\d,]+\.\d{2}).*?at\s+(.+?)\s*(?:-|)\s*\./s;
+              const match2 = cleanText.match(regex2);
+              if (match2) {
+                const amount = match2[1].trim();
+                const merchant = match2[2].trim();
+                const bodyPayload = {
+                  snippet: snippet,
+                  rawText: cleanText.slice(0, 200), // preview first 200 chars
+                  amount: amount,
+                  description: merchant,
+                }
+                await sendToDb(bodyPayload,userID)
+              } 
+
+              // Pattern 3: DBS Paynow/CC && OCBC NETS QR
+              const regex3 = /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+?)(?=\n|if unauthorised)/i;
+              const match3 = cleanText.match(regex3);
+
+              if (match3) {
+                const bodyPayload = {
+                  snippet,
+                  rawText: cleanText.slice(0, 200),
+                  amount: match3[1].trim(),
+                  description: match3[2].trim(),
+                };
+                await sendToDb(bodyPayload, userID);
+              }
+
+            }
+          }
+        }
+      }
+
+      msg.ack();
+      } catch (err) {
+      console.error("❌ Error handling message:", err);
+    }
+  });
+
+  subscription.on("error", (err) => {
+    console.error("❌ Subscription error:", err);
+  });
+} 
