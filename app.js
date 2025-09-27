@@ -54,16 +54,24 @@ function createOAuthClient(userID,tokens) {
   client.setCredentials(tokens);
     // Auto-refresh listener
   client.on("tokens", async (newTokens) => {
-    if (newTokens.refresh_token) {
-      tokens.refresh_token = newTokens.refresh_token;
-    }
-    if (newTokens.access_token) {
-      tokens.access_token = newTokens.access_token;
-      tokens.expiry_date = newTokens.expiry_date;
-    }
-    await updateOauthToken(userID,tokens)
+    await safeUpdateTokens(userID,tokens,newTokens)
   });
   return client;
+}
+
+async function safeUpdateTokens(userID, oldTokens, newTokens) {
+  const merged = { ...oldTokens };
+
+  if (newTokens.access_token) {
+    merged.access_token = newTokens.access_token;
+    merged.expiry_date = newTokens.expiry_date;
+  }
+
+  if (newTokens.refresh_token) {
+    merged.refresh_token = newTokens.refresh_token;
+  }
+
+  await updateOauthToken(userID, merged);
 }
 
 const userState = new Map()
