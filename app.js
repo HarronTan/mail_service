@@ -45,7 +45,7 @@ async function getEmailFromAccessToken(access_token) {
   return profile;
 }
 
-function createOAuthClient(userID,tokens) {
+async function createOAuthClient(userID,tokens) {
   const client = new google.auth.OAuth2(
     process.env.CLIENT_ID,
     process.env.CLIENT_SECRET,
@@ -56,6 +56,22 @@ function createOAuthClient(userID,tokens) {
   client.on("tokens", async (newTokens) => {
     await safeUpdateTokens(userID,tokens,newTokens)
   });
+
+  
+  // Check expiry and refresh proactively
+  const expiry = tokens?.expiry_date || 0;
+  if (tokens?.refresh_token && Date.now() >= (expiry - EXPIRY_MARGIN_MS)) {
+    try {
+      const { token } = await client.getAccessToken(); 
+      if (token) {
+        // getAccessToken() internally triggers refresh if needed,
+        // which will emit the "tokens" event we listen to above.
+        console.log("🔄 Access token refreshed for user", userID);
+      }
+    } catch (err) {
+      console.error("❌ Failed to refresh access token for user", userID, err);
+    }
+  }
   return client;
 }
 
@@ -110,7 +126,7 @@ app.get("/oauth2callback", async (req, res) => {
 
   await updateOauthToken(user.id,tokens)
 
-  const auth = createOAuthClient(user.id,tokens)
+  const auth = await createOAuthClient(user.id,tokens)
   const gmail = google.gmail({ version: "v1", auth });
 
   const response = await gmail.users.watch({
@@ -130,7 +146,7 @@ app.get("/oauth2callback", async (req, res) => {
 
 app.get("/start-watch/:userId", async (req, res) => {
   const tokens = userState.get(req.params.userId)
-  const auth = createOAuthClient(req.params.userId,tokens)
+  const auth = await createOAuthClient(req.params.userId,tokens)
   const gmail = google.gmail({ version: "v1", auth });
 
   const response = await gmail.users.watch({
@@ -376,7 +392,7 @@ async function startServer() {
       const userID = user.id
       const tokens = await getUserToken(userID)
       if(tokens == null) return
-      const auth = createOAuthClient(userID,tokens)
+      const auth = await createOAuthClient(userID,tokens)
       
       const gmail = google.gmail({ version: "v1", auth });
       const lastHistoryId = await getLastHistoryId(userID)
