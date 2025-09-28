@@ -57,7 +57,7 @@ async function createOAuthClient(userID,tokens) {
     await safeUpdateTokens(userID,tokens,newTokens)
   });
 
-  
+  const EXPIRY_MARGIN_MS = 60*10*1000
   // Check expiry and refresh proactively
   const expiry = tokens?.expiry_date || 0;
   if (tokens?.refresh_token && Date.now() >= (expiry - EXPIRY_MARGIN_MS)) {
@@ -378,6 +378,7 @@ async function updateLastHistoryId(user_id,history_id) {
 }
 
 async function startServer() {
+  console.log("Starting server....")
   const pubsub = new PubSub({ projectId: "mail-service-470611", credentials: serviceAccount });
   const subscription = pubsub.subscription("gmail-updates-sub");
 
