@@ -45,35 +45,49 @@ async function getEmailFromAccessToken(access_token) {
   return profile;
 }
 
-async function createOAuthClient(userID,tokens) {
+async function createOAuthClient(userID, tokens) {
   const client = new google.auth.OAuth2(
     process.env.CLIENT_ID,
     process.env.CLIENT_SECRET,
     `${PROTOCOL}://${host}/oauth2callback`
   );
+
   client.setCredentials(tokens);
-    // Auto-refresh listener
+
+  // Auto-refresh listener (fires on API-triggered refresh)
   client.on("tokens", async (newTokens) => {
-    await safeUpdateTokens(userID,tokens,newTokens)
+    await safeUpdateTokens(userID, tokens, newTokens);
+    tokens = { ...tokens, ...newTokens };
   });
 
-  const EXPIRY_MARGIN_MS = 60*10*1000
-  // Check expiry and refresh proactively
-  const expiry = tokens?.expiry_date || 0;
+  const EXPIRY_MARGIN_MS = 10 * 60 * 1000; // 10 minutes
+  const expiry = tokens?.expiry_date ? new Date(tokens.expiry_date).getTime() : 0;
+
   if (tokens?.refresh_token && Date.now() >= (expiry - EXPIRY_MARGIN_MS)) {
     try {
-      const { token } = await client.getAccessToken(); 
+      const { token, res } = await client.getAccessToken();
+
       if (token) {
-        // getAccessToken() internally triggers refresh if needed,
-        // which will emit the "tokens" event we listen to above.
         console.log("🔄 Access token refreshed for user", userID);
+
+        // Manually persist because "tokens" event may not fire here
+        await safeUpdateTokens(userID, tokens, {
+          access_token: token,
+          expiry_date: Date.now() + (res?.data?.expires_in || 3600) * 1000,
+        });
+
+        tokens.access_token = token;
+        tokens.expiry_date = Date.now() + (res?.data?.expires_in || 3600) * 1000;
+        client.setCredentials(tokens);
       }
     } catch (err) {
       console.error("❌ Failed to refresh access token for user", userID, err);
     }
   }
+
   return client;
 }
+
 
 async function safeUpdateTokens(userID, oldTokens, newTokens) {
   const merged = { ...oldTokens };
@@ -89,9 +103,6 @@ async function safeUpdateTokens(userID, oldTokens, newTokens) {
 
   await updateOauthToken(userID, merged);
 }
-
-const userState = new Map()
-const userLastHistoryId = new Map()
 
 app.get("/healthcheck", (req, res) => {
   res.status(200).send();
@@ -144,11 +155,11 @@ app.get("/oauth2callback", async (req, res) => {
   res.send(`User ${email} authenticated successfully!`);
 });
 
-app.get("/start-watch/:userId", async (req, res) => {
-  const tokens = userState.get(req.params.userId)
-  const auth = await createOAuthClient(req.params.userId,tokens)
+app.get("/start-watch", async (req, res) => {
+  const user = await getUser("harrontan@gmail.com")
+  const tokens = await getUserToken(user.id)
+  const auth = await createOAuthClient(user.id,tokens)
   const gmail = google.gmail({ version: "v1", auth });
-
   const response = await gmail.users.watch({
     userId: "me",
     requestBody: {
@@ -156,8 +167,6 @@ app.get("/start-watch/:userId", async (req, res) => {
       labelIds: ["INBOX"], // optional: only watch inbox
     },
   });
-  const data =response.data
-  userLastHistoryId.set(req.params.userId, data.historyId);
   res.json(response.data);
 });
 
