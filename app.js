@@ -45,7 +45,13 @@ async function getEmailFromAccessToken(access_token) {
   return profile;
 }
 
-async function createOAuthClient(userID, tokens) {
+const clients = new Map();
+
+export function getOAuthClient(userID, tokens) {
+  if (clients.has(userID)) {
+    return clients.get(userID);
+  }
+
   const client = new google.auth.OAuth2(
     process.env.CLIENT_ID,
     process.env.CLIENT_SECRET,
@@ -54,37 +60,12 @@ async function createOAuthClient(userID, tokens) {
 
   client.setCredentials(tokens);
 
-  // Auto-refresh listener (fires on API-triggered refresh)
   client.on("tokens", async (newTokens) => {
+    console.log("🔄 Token event fired for", userID);
     await safeUpdateTokens(userID, tokens, newTokens);
-    tokens = { ...tokens, ...newTokens };
   });
 
-  const EXPIRY_MARGIN_MS = 10 * 60 * 1000; // 10 minutes
-  const expiry = tokens?.expiry_date ? new Date(tokens.expiry_date).getTime() : 0;
-
-  if (tokens?.refresh_token && Date.now() >= (expiry - EXPIRY_MARGIN_MS)) {
-    try {
-      const { token, res } = await client.getAccessToken();
-
-      if (token) {
-        console.log("🔄 Access token refreshed for user", userID);
-
-        // Manually persist because "tokens" event may not fire here
-        await safeUpdateTokens(userID, tokens, {
-          access_token: token,
-          expiry_date: Date.now() + (res?.data?.expires_in || 3600) * 1000,
-        });
-
-        tokens.access_token = token;
-        tokens.expiry_date = Date.now() + (res?.data?.expires_in || 3600) * 1000;
-        client.setCredentials(tokens);
-      }
-    } catch (err) {
-      console.error("❌ Failed to refresh access token for user", userID, err);
-    }
-  }
-
+  clients.set(userID, client);
   return client;
 }
 
@@ -137,7 +118,7 @@ app.get("/oauth2callback", async (req, res) => {
 
   await updateOauthToken(user.id,tokens)
 
-  const auth = await createOAuthClient(user.id,tokens)
+  const auth = await getOAuthClient(user.id,tokens)
   const gmail = google.gmail({ version: "v1", auth });
 
   const response = await gmail.users.watch({
@@ -402,7 +383,7 @@ async function startServer() {
       const userID = user.id
       const tokens = await getUserToken(userID)
       if(tokens == null) return
-      const auth = await createOAuthClient(userID,tokens)
+      const auth = await getOAuthClient(userID,tokens)
       
       const gmail = google.gmail({ version: "v1", auth });
       const lastHistoryId = await getLastHistoryId(userID)
