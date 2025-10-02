@@ -433,7 +433,7 @@ async function startServer() {
       const historyRes = await gmail.users.history.list({
         userId: 'me',
         startHistoryId: lastHistoryId,
-      });
+      }).catch((error) => {throw({error, userID})})
       await updateLastHistoryId(userID,data.historyId)
 
       const history = historyRes.data.history || [];
@@ -513,12 +513,13 @@ async function startServer() {
 
       msg.ack();
       } catch (err) {
-      if(JSON.stringify(err).includes("Request had invalid authentication credentials.")){
-        await delUserToken(userID)
-        await sendUserCustomNotification(userID,"Token Expired", "Please reauthenticate!")
-      }
+        const {error,userID} = err
+        if(JSON.stringify(error).includes("Request had invalid authentication credentials.")){
+          await delUserToken(userID)
+          await sendUserCustomNotification(userID,"Token Expired", "Please reauthenticate!")
+        }
       else {
-        console.error("❌ Error handling message:", err);
+        console.error("❌ Error handling message:", error);
       }    
     }
   });
