@@ -436,8 +436,9 @@ async function startServer() {
                 await sendToDb(bodyPayload,userID)
               }
 
-              // Pattern 2: SB CC
-              const regex2 = /\+SGD\s*([\d,]+\.\d{2}).*?at\s+(.+?)\s*(?:-|)\s*\./s;
+              // Pattern 2: SB CC and OCBC CC
+              // const regex2 = /\+SGD\s*([\d,]+\.\d{2}).*?at\s+(.+?)\s*(?:-|)\s*\./s;
+              const regex2 = /\+?SGD\s*([\d,]+\.\d{2}).*?at\s+(.+?)(?:\s*[-–])?\s*\./i;
               const match2 = cleanText.match(regex2);
               if (match2) {
                 const amount = match2[1].trim();
