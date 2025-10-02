@@ -247,6 +247,33 @@ function htmlToText(html) {
   return $("body").text().replace(/\s+/g, " ").trim(); // collapse whitespace
 }
 
+async function sendUserCustomNotification(userId,title,message) {
+  let { data, error } = await supabase
+    .from('push_subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+  
+  if(data.length != 1) return
+
+  data = data[0]
+  const subscription = {
+    endpoint: data.endpoint,
+    keys: {
+      p256dh: data.p256dh,
+      auth: data.auth
+    }
+  }
+
+  const payload = JSON.stringify({
+    title: title,
+    body: message,
+    icon: "/icons/notification.png",
+    // url: "https://your-app.com/expenses"
+  });
+
+  await sendNotification(subscription,payload)
+}
+
 async function sendUserNotification(userId,amount,desc) {
   
   let { data, error } = await supabase
@@ -325,6 +352,20 @@ async function getUserToken(userID) {
   }
 
   return data;
+}
+
+async function delUserToken(userID) {
+  const { data, error } = await supabase
+    .from("oauth_tokens")
+    .delete()
+    .eq("user_id", userID)
+    .select(); // return deleted rows
+
+  if (error) {
+    throw error;
+  }
+
+  return data; // deleted rows
 }
 
 async function updateOauthToken(user_id,tokens) {
@@ -473,7 +514,13 @@ async function startServer() {
 
       msg.ack();
       } catch (err) {
-      console.error("❌ Error handling message:", err);
+      if(err.includes("Request had invalid authentication credentials.")){
+        await delUserToken(userID)
+        await sendUserCustomNotification(userID,"Token Expired", "Please reauthenticate!")
+      }
+      else {
+        console.error("❌ Error handling message:", err);
+      }    
     }
   });
 
