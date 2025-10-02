@@ -478,8 +478,7 @@ async function startServer() {
               }
 
               // Pattern 2: SB CC and OCBC CC
-              // const regex2 = /\+SGD\s*([\d,]+\.\d{2}).*?at\s+(.+?)\s*(?:-|)\s*\./s;
-              const regex2 = /\+?SGD\s*([\d,]+\.\d{2}).*?at\s+(.+?)(?:\s*[-–])?\s*\./i;
+              const regex2 = /\+?SGD\s*([\d,]+\.\d{2}).*at\s+([^\.]+)\./i;
               const match2 = cleanText.match(regex2);
               if (match2) {
                 const amount = match2[1].trim();
