@@ -513,7 +513,7 @@ async function startServer() {
 
       msg.ack();
       } catch (err) {
-      if(err.includes("Request had invalid authentication credentials.")){
+      if(JSON.stringify(err).includes("Request had invalid authentication credentials.")){
         await delUserToken(userID)
         await sendUserCustomNotification(userID,"Token Expired", "Please reauthenticate!")
       }
