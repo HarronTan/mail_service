@@ -209,7 +209,8 @@ async function sendToDb(transaction,user_id) {
         "user_id": user_id,
         "amount": amount,
         "description": description,
-        "category_name": category_name
+        "category_name": category_name,
+        "date": new Date().toISOString()
       }
     ),
   })
@@ -434,15 +435,19 @@ async function startServer() {
         userId: 'me',
         startHistoryId: lastHistoryId,
       }).catch((error) => {throw({error, userID})})
-      await updateLastHistoryId(userID,data.historyId)
+      const newLastHistoryId = historyRes.data.historyId || lastHistoryId;
+      await updateLastHistoryId(userID,newLastHistoryId)
 
       const history = historyRes.data.history || [];
       
+      const processedMessageIds = new Set();
+
       for (const record of history) {
         if (record.messagesAdded) {
           for (const added of record.messagesAdded) {
             const messageId = added.message.id;
-
+            if (processedMessageIds.has(messageId)) continue;
+            processedMessageIds.add(messageId);
             let message;
             try {
               message = await gmail.users.messages.get({
@@ -478,7 +483,7 @@ async function startServer() {
                 continue
               }
               
-              
+
               const regexOCBC = /SGD\s*([\d,]+\.\d{2}).*at\s+(?:.*\s)?at\s+([^\.\n]+)\./i
               const matchOCBC = cleanText.match(regexOCBC)
               if (matchOCBC) {
