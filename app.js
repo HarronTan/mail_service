@@ -475,9 +475,27 @@ async function startServer() {
                   description: match[1] ? match[1].trim() : 0,
                 }
                 await sendToDb(bodyPayload,userID)
+                continue
+              }
+              
+              
+              const regexOCBC = /SGD\s*([\d,]+\.\d{2}).*at\s+(?:.*\s)?at\s+([^\.\n]+)\./i
+              const matchOCBC = cleanText.match(regexOCBC)
+              if (matchOCBC) {
+                const amount = matchOCBC[1].trim();
+                const merchant = matchOCBC[2].trim();
+                const bodyPayload = {
+                  snippet: snippet,
+                  rawText: cleanText.slice(0, 200), // preview first 200 chars
+                  amount: amount,
+                  description: merchant,
+                }
+                await sendToDb(bodyPayload,userID)
+                continue                
               }
 
-              // Pattern 2: SB CC and OCBC CC
+
+              // Pattern 2: SB CC 
               const regex2 = /\+?SGD\s*([\d,]+\.\d{2}).*at\s+([^\.]+)\./i;
               const match2 = cleanText.match(regex2);
               if (match2) {
@@ -490,6 +508,7 @@ async function startServer() {
                   description: merchant,
                 }
                 await sendToDb(bodyPayload,userID)
+                continue
               } 
 
               // Pattern 3: DBS Paynow/CC && OCBC NETS QR
@@ -504,6 +523,7 @@ async function startServer() {
                   description: match3[2].trim(),
                 };
                 await sendToDb(bodyPayload, userID);
+                continue
               }
 
             }
