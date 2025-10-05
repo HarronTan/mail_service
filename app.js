@@ -516,6 +516,7 @@ async function startServer() {
         const {error,userID} = err
         if(JSON.stringify(error).includes("Request had invalid authentication credentials.")){
           await delUserToken(userID)
+          clients.delete(userID)
           await sendUserCustomNotification(userID,"Token Expired", "Please reauthenticate!")
         }
       else {
