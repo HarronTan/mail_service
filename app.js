@@ -502,7 +502,7 @@ async function startServer() {
                   description: match[1] ? match[1].trim() : 0,
                 }
                 await sendToDb(bodyPayload,userID)
-                continue
+                break
               }
               
 
@@ -518,7 +518,7 @@ async function startServer() {
                   description: merchant,
                 }
                 await sendToDb(bodyPayload,userID)
-                continue                
+                break                
               }
 
 
@@ -535,7 +535,7 @@ async function startServer() {
                   description: merchant,
                 }
                 await sendToDb(bodyPayload,userID)
-                continue
+                break
               } 
 
               // Pattern 3: DBS Paynow/CC && OCBC NETS QR
@@ -550,7 +550,7 @@ async function startServer() {
                   description: match3[2].trim(),
                 };
                 await sendToDb(bodyPayload, userID);
-                continue
+                break
               }
 
             }
