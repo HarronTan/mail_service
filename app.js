@@ -8,6 +8,7 @@ import { readFileSync } from "fs";
 import webPush from "web-push";
 import { createClient } from '@supabase/supabase-js'
 import * as cheerio from "cheerio";
+import {detectCategoryUsingAI} from "./gemini.js"
 
 webPush.setVapidDetails(
   "mailto:you@example.com",
@@ -193,9 +194,15 @@ function detectCategory(description) {
 
 async function sendToDb(transaction,user_id) {
   
+  const userCategoriesData = await getUserCategories(user_id)
+  const categories = userCategoriesData == null 
+    ? null : 
+      userCategoriesData.length > 0 
+      ? userCategoriesData.map((d) => d.name).join() : 
+      null
   const amount = Number(transaction.amount)
   const description = transaction.description
-  const category_name = detectCategory(description)
+  const category_name = categories == null ? "Uncategorized" : await detectCategoryUsingAI(description,categories)
 
 
   const response = await fetch('https://doqgomabmxpcijxoliff.supabase.co/functions/v1/add-expense', {
@@ -354,6 +361,21 @@ async function getUserToken(userID) {
 
   return data;
 }
+
+export async function getUserCategories(userID) {
+  const { data, error } = await supabase
+    .from("categories")
+    .select("name")
+    .eq("user_id", userID)
+
+  if (error) {
+    console.log(error)
+    return null;
+  }
+
+  return data;
+}
+
 
 async function delUserToken(userID) {
   const { data, error } = await supabase
