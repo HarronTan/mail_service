@@ -489,7 +489,7 @@ async function startServer() {
               
               const rawBody = getBody(message.data.payload);
               const cleanText = /<[^>]+>/.test(rawBody) ? htmlToText(rawBody) : rawBody;
-              console.log(cleanText)
+
               // Pattern 1: OCBC Paynow
               const regex = /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s;
               const match = cleanText.match(regex);
@@ -521,6 +521,21 @@ async function startServer() {
                 break                
               }
 
+              // NETS
+              const regexNETS = /Amount:\s*SGD\s*([\d.,]+).*?To:\s*(.*?)NETS/i
+              const matchNETS = cleanText.match(regexNETS)
+              if (matchNETS) {
+                const amount = matchNETS[1].trim();
+                const merchant = matchNETS[2].trim();
+                const bodyPayload = {
+                  snippet: snippet,
+                  rawText: cleanText.slice(0, 200), // preview first 200 chars
+                  amount: amount,
+                  description: merchant,
+                }
+                await sendToDb(bodyPayload,userID)
+                break                
+              }
 
               // Pattern 2: SB CC 
               const regex2 = /\+?SGD\s*([\d,]+\.\d{2}).*at\s+([^\.]+)\./i;

@@ -1,35 +1,10 @@
 import { adsense_v1_4 } from "googleapis";
 
 const cleanText = `	
-Dear Valued Customer
-
-The following NETS QR payment has been made:
-
-Date	: 24 Oct 2025
-Time	: 12:35pm SGT
-Amount	: SGD 5.10
-From your account	: 360 Account (-462001)
-To	: SAN HUP AMK 529
-NETS merchant ID	: 11101027924
-NETS Stan ID	: 000000
-Reference number	: 2510240116548169
-
-If you have any questions, please call our Personal Banking hotline: OCBC website > Contact us.
-
-Thank you for banking with us. We look forward to serving you again.
-
-Yours sincerely
-
-Digital Business
-Global Consumer Financial Services
-OCBC
-Tip: To subscribe or change your settings for e-Alerts, log in to OCBC Internet Banking > Customer Service (on the top navigation bar) > Manage e-Alerts.
-
-Do allow us to warn you against phishing attempts involving e-mails that claim to be from OCBC. We will not send you any emails with links requesting your Access Code, PIN or One-time Password. Enter your login credentials only into the OCBC app or after accessing the OCBC website (always type out the URL to do this).
-
+Dear Valued CustomerThe following NETS QR payment has been made:Date: 24 Oct 2025Time: 06:52pm SGTAmount: SGD 0.30From your account: 360 Account (-462001)To: S. PARK GRILL AND PASTANETS merchant ID: 11170842700NETS Stan ID: 000000Reference number: 2510240116710660If you have any questions, please call our Personal Banking hotline: OCBC website > Contact us.Thank you for banking with us. We look forward to serving you again.Yours sincerelyDigital BusinessGlobal Consumer Financial ServicesOCBCTip: To subscribe or change your settings for e-Alerts, log in to OCBC Internet Banking > Customer Service (on the top navigation bar) > Manage e-Alerts.Do allow us to warn you against phishing attempts involving e-mails that claim to be from OCBC. We will not send you any emails with links requesting your Access Code, PIN or One-time Password. Enter your login credentials only into the OCBC app or after accessing the OCBC website (always type out the URL to do this).
 
 `
-const regex = /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s;
+const regex = /Amount:\s*SGD\s*([\d.,]+).*?To:\s*(.*?)NETS/i;
 const match = cleanText.match(regex);
 
 if(match) {
