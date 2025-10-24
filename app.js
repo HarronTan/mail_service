@@ -489,7 +489,7 @@ async function startServer() {
               
               const rawBody = getBody(message.data.payload);
               const cleanText = /<[^>]+>/.test(rawBody) ? htmlToText(rawBody) : rawBody;
-
+              console.log(cleanText)
               // Pattern 1: OCBC Paynow
               const regex = /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s;
               const match = cleanText.match(regex);
