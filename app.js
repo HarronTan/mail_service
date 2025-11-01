@@ -525,13 +525,13 @@ async function startServer() {
 
       processedMessageIds.clear()
       msg.ack();
-      } catch (err) {
-        const {error,userID} = err
-        if(JSON.stringify(error).includes("Request had invalid authentication credentials.")){
-          await delUserToken(userID)
-          clients.delete(userID)
-          await sendUserCustomNotification(userID,"Token Expired", "Please reauthenticate!")
-        }
+    } catch (err) {
+      const {error,userID} = err
+      if(error && JSON.stringify(error).includes("Request had invalid authentication credentials.")){
+        await delUserToken(userID)
+        clients.delete(userID)
+        await sendUserCustomNotification(userID,"Token Expired", "Please reauthenticate!")
+      }
       else {
         console.error("❌ Error handling message:", error);
       }    
