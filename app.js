@@ -462,7 +462,10 @@ async function startServer() {
       const historyRes = await gmail.users.history.list({
         userId: 'me',
         startHistoryId: lastHistoryId,
-      }).catch((error) => {throw({error, userID})})
+      }).catch((err) => {
+        err.userID = userID;
+        throw err;
+      });
       const newLastHistoryId = historyRes.data.historyId || lastHistoryId;
       await updateLastHistoryId(userID,newLastHistoryId)
 
@@ -503,7 +506,7 @@ async function startServer() {
                 /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+?)(?=\n|if unauthorised)/i // DBS Paynow
               ]
 
-              for(regex of regexs) {
+              for(const regex of regexs) {
                 const match = cleanText.match(regex)
                 if (match) {
                   const amount = match[1].trim();
@@ -526,15 +529,13 @@ async function startServer() {
       processedMessageIds.clear()
       msg.ack();
     } catch (err) {
-      const {error,userID} = err
-      if(error && JSON.stringify(error).includes("Request had invalid authentication credentials.")){
-        await delUserToken(userID)
-        clients.delete(userID)
-        await sendUserCustomNotification(userID,"Token Expired", "Please reauthenticate!")
+      if (JSON.stringify(err).includes("Request had invalid authentication credentials.")) {
+        await delUserToken(err.userID);
+        clients.delete(err.userID);
+        await sendUserCustomNotification(err.userID, "Token Expired", "Please reauthenticate!");
+      } else {
+        console.error("❌ Error handling message:", err);
       }
-      else {
-        console.error("❌ Error handling message:", error);
-      }    
     }
   });
 
