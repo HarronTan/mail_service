@@ -506,11 +506,12 @@ async function startServer() {
                 /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+?)(?=\n|if unauthorised)/i // DBS Paynow
               ]
 
+              let ind = 0
               for(const regex of regexs) {
                 const match = cleanText.match(regex)
                 if (match) {
-                  const amount = match[1].trim();
-                  const merchant = match[2].trim();
+                  const amount =  match[ind == 1 ? 2 : 1].trim();
+                  const merchant = match[ind == 1 ? 1 : 2].trim();
                   const bodyPayload = {
                     snippet: snippet,
                     rawText: cleanText.slice(0, 200), // preview first 200 chars
@@ -520,6 +521,7 @@ async function startServer() {
                   await sendToDb(bodyPayload,userID)
                   break                
                 }
+                ind += 1
               }
             }
           }
