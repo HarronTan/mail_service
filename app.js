@@ -169,28 +169,11 @@ app.get("/test/send", async (req,res) => {
   res.status(200).send()
 })
 
-function detectCategory(description) {
-  if (!description) return "Others";
-
-  const categoryMap = {
-    "PARKING.SG": "Transport",
-    "GRAB": "Transport",
-    "COMFORT": "Transport",
-    "MRT": "Transport",
-    "BUS": "Transport",
-  };
-
-  const upperDesc = description.toUpperCase();
-
-  for (const [keyword, category] of Object.entries(categoryMap)) {
-    if (upperDesc.includes(keyword)) {
-      return category;
-    }
-  }
-
-  return "Food"; // fallback
-}
-
+app.get("/test", async (req,res) => {
+  console.log(clients)
+  await validatingAuthclients()
+  console.log(clients)
+})
 
 async function sendToDb(transaction,user_id) {
   
@@ -362,6 +345,17 @@ async function getUserToken(userID) {
   return data;
 }
 
+async function getUserTokenlist() {
+  const {data,error} = await supabase
+    .from("oauth_tokens")
+    .select("*")
+
+  if(error) {
+    return null
+  }
+  return data
+}
+
 export async function getUserCategories(userID) {
   const { data, error } = await supabase
     .from("categories")
@@ -431,10 +425,22 @@ async function updateLastHistoryId(user_id,history_id) {
   }); 
 }
 
+async function validatingAuthclients() {
+  const authList = await getUserTokenlist()
+  if (authList == null) return
+
+  for(const auth_token of authList) {
+    await getOAuthClient(auth_token.user_id, auth_token)
+  }
+}
+
 async function startServer() {
   console.log("Starting server....")
   const pubsub = new PubSub({ projectId: "mail-service-470611", credentials: serviceAccount });
   const subscription = pubsub.subscription("gmail-updates-sub");
+  const processedMessageIds = new Set();
+  await validatingAuthclients()
+
 
   subscription.on("message", async (msg) => {
   
@@ -462,7 +468,6 @@ async function startServer() {
 
       const history = historyRes.data.history || [];
       
-      const processedMessageIds = new Set();
 
       for (const record of history) {
         if (record.messagesAdded) {
@@ -490,6 +495,22 @@ async function startServer() {
               const rawBody = getBody(message.data.payload);
               const cleanText = /<[^>]+>/.test(rawBody) ? htmlToText(rawBody) : rawBody;
 
+              // NETS
+              const regexNETS = /Amount:\s*SGD\s*([\d.,]+).*?To:\s*(.*?)NETS/i
+              const matchNETS = cleanText.match(regexNETS)
+              if (matchNETS) {
+                const amount = matchNETS[1].trim();
+                const merchant = matchNETS[2].trim();
+                const bodyPayload = {
+                  snippet: snippet,
+                  rawText: cleanText.slice(0, 200), // preview first 200 chars
+                  amount: amount,
+                  description: merchant,
+                }
+                await sendToDb(bodyPayload,userID)
+                break                
+              }
+
               // Pattern 1: OCBC Paynow
               const regex = /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s;
               const match = cleanText.match(regex);
@@ -511,22 +532,6 @@ async function startServer() {
               if (matchOCBC) {
                 const amount = matchOCBC[1].trim();
                 const merchant = matchOCBC[2].trim();
-                const bodyPayload = {
-                  snippet: snippet,
-                  rawText: cleanText.slice(0, 200), // preview first 200 chars
-                  amount: amount,
-                  description: merchant,
-                }
-                await sendToDb(bodyPayload,userID)
-                break                
-              }
-
-              // NETS
-              const regexNETS = /Amount:\s*SGD\s*([\d.,]+).*?To:\s*(.*?)NETS/i
-              const matchNETS = cleanText.match(regexNETS)
-              if (matchNETS) {
-                const amount = matchNETS[1].trim();
-                const merchant = matchNETS[2].trim();
                 const bodyPayload = {
                   snippet: snippet,
                   rawText: cleanText.slice(0, 200), // preview first 200 chars
@@ -573,6 +578,7 @@ async function startServer() {
         }
       }
 
+      processedMessageIds.clear()
       msg.ack();
       } catch (err) {
         const {error,userID} = err
