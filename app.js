@@ -486,93 +486,38 @@ async function startServer() {
               continue; // skip this message and continue with next
             }
 
-              const snippet = message.data.snippet;
-              const internalDate = parseInt(message.data.internalDate);
+            const snippet = message.data.snippet;
+            const internalDate = parseInt(message.data.internalDate);
 
-              // Only process if received AFTER we started
-              if (internalDate > Date.now() - 60 * 1000) {
-              
+            // Only process if received AFTER we started
+            if (internalDate > Date.now() - 60 * 1000) {
+            
               const rawBody = getBody(message.data.payload);
               const cleanText = /<[^>]+>/.test(rawBody) ? htmlToText(rawBody) : rawBody;
 
-              // NETS
-              const regexNETS = /Amount:\s*SGD\s*([\d.,]+).*?To:\s*(.*?)NETS/i
-              const matchNETS = cleanText.match(regexNETS)
-              if (matchNETS) {
-                const amount = matchNETS[1].trim();
-                const merchant = matchNETS[2].trim();
-                const bodyPayload = {
-                  snippet: snippet,
-                  rawText: cleanText.slice(0, 200), // preview first 200 chars
-                  amount: amount,
-                  description: merchant,
+              const regexs = [
+                /Amount:\s*SGD\s*([\d.,]+).*?To:\s*(.*?)NETS/i, // NETS
+                /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s, // OCBC Paynow
+                /SGD\s*([\d,]+\.\d{2}).*at\s+(?:.*\s)?at\s+([^\.\n]+)\./i, // OCBC CC
+                /\+?SGD\s*([\d,]+\.\d{2}).*at\s+([^\.]+)\./i, // SC CC
+                /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+?)(?=\n|if unauthorised)/i // DBS Paynow
+              ]
+
+              for(regex of regexs) {
+                const match = cleanText.match(regex)
+                if (match) {
+                  const amount = match[1].trim();
+                  const merchant = match[2].trim();
+                  const bodyPayload = {
+                    snippet: snippet,
+                    rawText: cleanText.slice(0, 200), // preview first 200 chars
+                    amount: amount,
+                    description: merchant,
+                  }
+                  await sendToDb(bodyPayload,userID)
+                  break                
                 }
-                await sendToDb(bodyPayload,userID)
-                break                
               }
-
-              // Pattern 1: OCBC Paynow
-              const regex = /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s;
-              const match = cleanText.match(regex);
-
-              if(match) {
-                const bodyPayload = {
-                  snippet: snippet,
-                  rawText: cleanText.slice(0, 200), // preview first 200 chars
-                  amount: match[2] ? match[2].trim() : "Unknown",
-                  description: match[1] ? match[1].trim() : 0,
-                }
-                await sendToDb(bodyPayload,userID)
-                break
-              }
-              
-
-              const regexOCBC = /SGD\s*([\d,]+\.\d{2}).*at\s+(?:.*\s)?at\s+([^\.\n]+)\./i
-              const matchOCBC = cleanText.match(regexOCBC)
-              if (matchOCBC) {
-                const amount = matchOCBC[1].trim();
-                const merchant = matchOCBC[2].trim();
-                const bodyPayload = {
-                  snippet: snippet,
-                  rawText: cleanText.slice(0, 200), // preview first 200 chars
-                  amount: amount,
-                  description: merchant,
-                }
-                await sendToDb(bodyPayload,userID)
-                break                
-              }
-
-              // Pattern 2: SB CC 
-              const regex2 = /\+?SGD\s*([\d,]+\.\d{2}).*at\s+([^\.]+)\./i;
-              const match2 = cleanText.match(regex2);
-              if (match2) {
-                const amount = match2[1].trim();
-                const merchant = match2[2].trim();
-                const bodyPayload = {
-                  snippet: snippet,
-                  rawText: cleanText.slice(0, 200), // preview first 200 chars
-                  amount: amount,
-                  description: merchant,
-                }
-                await sendToDb(bodyPayload,userID)
-                break
-              } 
-
-              // Pattern 3: DBS Paynow/CC && OCBC NETS QR
-              const regex3 = /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+?)(?=\n|if unauthorised)/i;
-              const match3 = cleanText.match(regex3);
-
-              if (match3) {
-                const bodyPayload = {
-                  snippet,
-                  rawText: cleanText.slice(0, 200),
-                  amount: match3[1].trim(),
-                  description: match3[2].trim(),
-                };
-                await sendToDb(bodyPayload, userID);
-                break
-              }
-
             }
           }
         }
