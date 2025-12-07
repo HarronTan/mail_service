@@ -505,7 +505,7 @@ async function startServer() {
               for(const regex of regexs) {
                 const match = cleanText.match(regex)
                 if (match) {
-                  await sendToDb(bodyPayload,userID)
+                  await sendToDb(cleanText,userID)
                   break                
                 }
                 ind += 1
