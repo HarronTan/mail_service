@@ -169,13 +169,10 @@ app.get("/test/send", async (req,res) => {
   res.status(200).send()
 })
 
-app.get("/test", async (req,res) => {
-  console.log(clients)
-  await validatingAuthclients()
-  console.log(clients)
-})
+// app.get("/test", async (req,res) => {
+// })
 
-async function sendToDb(transaction,user_id) {
+async function sendToDb(rawDescription,user_id) {
   
   const userCategoriesData = await getUserCategories(user_id)
   const categories = userCategoriesData == null 
@@ -183,10 +180,8 @@ async function sendToDb(transaction,user_id) {
       userCategoriesData.length > 0 
       ? userCategoriesData.map((d) => d.name).join() : 
       null
-  const amount = Number(transaction.amount)
-  const description = transaction.description
-  const category_name = categories == null ? "Uncategorized" : await detectCategoryUsingAI(description,categories)
-
+  const {amount,description,category_name} = await detectCategoryUsingAI(rawDescription,categories)
+  
 
   const response = await fetch('https://doqgomabmxpcijxoliff.supabase.co/functions/v1/add-expense', {
     method: 'POST',
@@ -510,14 +505,6 @@ async function startServer() {
               for(const regex of regexs) {
                 const match = cleanText.match(regex)
                 if (match) {
-                  const amount =  match[ind == 1 ? 2 : 1].trim();
-                  const merchant = match[ind == 1 ? 1 : 2].trim();
-                  const bodyPayload = {
-                    snippet: snippet,
-                    rawText: cleanText.slice(0, 200), // preview first 200 chars
-                    amount: amount,
-                    description: merchant,
-                  }
                   await sendToDb(bodyPayload,userID)
                   break                
                 }
