@@ -39,6 +39,6 @@ try {
   else throw new Error("No JSON found in response");
 }
 
-console.log(json.category); // e.g. "Food"
-return json.category
+console.log(json);
+return json
 }
