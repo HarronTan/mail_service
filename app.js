@@ -436,7 +436,7 @@ async function startServer() {
   const processedMessageIds = new Set();
   await validatingAuthclients()
 
-
+  console.log("start subscribing!")
   subscription.on("message", async (msg) => {
   
     try {
@@ -492,7 +492,10 @@ async function startServer() {
             
               const rawBody = getBody(message.data.payload);
               const cleanText = /<[^>]+>/.test(rawBody) ? htmlToText(rawBody) : rawBody;
-
+              if(cleanText.includes("You have received")) {
+                console.log("Skipping received case!")
+                continue
+              }
               const regexs = [
                 /Amount:\s*SGD\s*([\d.,]+).*?To:\s*(.*?)NETS/i, // NETS
                 /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s, // OCBC Paynow
