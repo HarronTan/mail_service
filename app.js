@@ -180,7 +180,7 @@ async function sendToDb(rawDescription,user_id) {
       userCategoriesData.length > 0 
       ? userCategoriesData.map((d) => d.name).join() : 
       null
-  const {amount,description,category_name} = await detectCategoryUsingAI(rawDescription,categories)
+  const {amount,description,category} = await detectCategoryUsingAI(rawDescription,categories)
   
 
   const response = await fetch('https://doqgomabmxpcijxoliff.supabase.co/functions/v1/add-expense', {
@@ -194,7 +194,7 @@ async function sendToDb(rawDescription,user_id) {
         "user_id": user_id,
         "amount": amount,
         "description": description,
-        "category_name": category_name,
+        "category_name": category,
         "date": new Date().toISOString()
       }
     ),
