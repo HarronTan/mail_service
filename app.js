@@ -521,7 +521,7 @@ async function startServer() {
       processedMessageIds.clear()
       msg.ack();
     } catch (err) {
-      if (JSON.stringify(err).includes("Request had invalid authentication credentials.")) {
+      if (JSON.stringify(err).includes("Request had invalid authentication credentials.") || JSON.stringify(err).includes("invalid_grant")) {
         await delUserToken(err.userID);
         clients.delete(err.userID);
         await sendUserCustomNotification(err.userID, "Token Expired", "Please reauthenticate!");
