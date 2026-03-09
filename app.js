@@ -117,8 +117,6 @@ app.get("/oauth2callback", async (req, res) => {
     return
   }
 
-  await updateOauthToken(user.id,tokens)
-
   const auth = await getOAuthClient(user.id,tokens)
   const gmail = google.gmail({ version: "v1", auth });
 
@@ -128,10 +126,13 @@ app.get("/oauth2callback", async (req, res) => {
       topicName: "projects/mail-service-470611/topics/gmail-updates",
       labelIds: ["INBOX"], 
     },
+  }).catch((err)=> {
+    return res.send(err)
   });
   const data =response.data
 
   await updateLastHistoryId(user.id,data.historyId ?? "")
+  await updateOauthToken(user.id,tokens)
 
   // userState.set(state,tokens)
   res.send(`User ${email} authenticated successfully!`);
