@@ -521,12 +521,13 @@ async function startServer() {
       processedMessageIds.clear()
       msg.ack();
     } catch (err) {
+      const errStr = err?.message || JSON.stringify(err);
       const knownErrors = [
         "Request had invalid authentication credentials.",
         "invalid_grant",
         "Request had insufficient authentication scopes"
       ]
-      if ( knownErrors.includes(JSON.stringify(err))) {
+      if ( knownErrors.some(e => errStr.includes(e))) {
         await delUserToken(err.userID);
         clients.delete(err.userID);
         await sendUserCustomNotification(err.userID, "Token Expired", "Please reauthenticate!");
