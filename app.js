@@ -502,7 +502,8 @@ async function startServer() {
                 /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s, // OCBC Paynow
                 /SGD\s*([\d,]+\.\d{2}).*at\s+(?:.*\s)?at\s+([^\.\n]+)\./i, // OCBC CC
                 /\+?SGD\s*([\d,]+\.\d{2}).*at\s+([^\.]+)\./i, // SC CC
-                /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+?)(?=\n|if unauthorised)/i // DBS Paynow
+                /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+?)(?=\n|if unauthorised)/i, // DBS Paynow
+                /Transaction Amount\s+([A-Z]{3}\d+(?:\.\d+)?)\s+Description\s+(.+)/ // HSBC
               ]
 
               let ind = 0
