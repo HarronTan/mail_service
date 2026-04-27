@@ -499,6 +499,7 @@ async function startServer() {
               });
             } catch (err) {
               console.error(`Error fetching message ${messageId}`);
+              console.error(JSON.stringify(err))
               continue; // skip this message and continue with next
             }
 
