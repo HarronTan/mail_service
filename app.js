@@ -637,7 +637,7 @@ app.get("/privacy", async (req, res) => {
             <p>We implement token refresh mechanisms to maintain service stability without interrupting your email monitoring. Your OAuth tokens are securely stored in Supabase.</p>
             
             <p><strong>Contact:</strong></p>
-            <p>For privacy concerns, please contact [CONTACT_EMAIL].</p>
+            <p>For privacy concerns, please contact harrontan@gamil.com.</p>
             
             <p>Last updated: ${new Date().toLocaleDateString()}</p>
         </body>
@@ -719,7 +719,7 @@ app.get("/terms", async (req, res) => {
             <p>We reserve the right to modify these terms at any time. Your continued use of the application constitutes acceptance of modified terms.</p>
             
             <p><strong>Contact Information:</strong></p>
-            <p>For terms-related concerns, please contact [CONTACT_EMAIL].</p>
+            <p>For terms-related concerns, please contact harrontan@gamil.com.</p>
             
             <p>Last updated: ${new Date().toLocaleDateString()}</p>
         </body>
