@@ -575,6 +575,7 @@ app.get("/", async (req, res) => {
         <!DOCTYPE html>
         <html lang="en">
         <head>
+            <meta name="google-site-verification" content="0FRzl8YcSmmPpkEt6uU_A-vvHsp5-PQZbj5nY0URWew" />
             <meta charset="UTF-8">
             <title>Email Transaction Monitor</title>
             <style>
