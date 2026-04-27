@@ -6,41 +6,42 @@ import "dotenv/config";
 import { PubSub } from "@google-cloud/pubsub";
 import { readFileSync } from "fs";
 import webPush from "web-push";
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from "@supabase/supabase-js";
 import * as cheerio from "cheerio";
-import {detectCategoryUsingAI} from "./gemini.js"
+import { detectCategoryUsingAI } from "./gemini.js";
 
 webPush.setVapidDetails(
   "mailto:you@example.com",
   process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
+  process.env.VAPID_PRIVATE_KEY,
 );
 
-const supabaseUrl = 'https://doqgomabmxpcijxoliff.supabase.co'
-const supabaseKey = process.env.SUPABASE_KEY
-const supabase = createClient(supabaseUrl, supabaseKey)
+const supabaseUrl = "https://doqgomabmxpcijxoliff.supabase.co";
+const supabaseKey = process.env.SUPABASE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-const serviceAccount = JSON.parse(readFileSync(new URL("./service-account.json", import.meta.url)));
+const serviceAccount = JSON.parse(
+  readFileSync(new URL("./service-account.json", import.meta.url)),
+);
 
 const app = express();
 app.use(bodyParser.json());
 
-const port = process.env.PORT
-const host = process.env.HOST
-const PROTOCOL = process.env.PROTOCOL
+const port = process.env.PORT;
+const host = process.env.HOST;
+const PROTOCOL = process.env.PROTOCOL;
 
 const oAuth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
-  `${PROTOCOL}://${host}/oauth2callback`
+  `${PROTOCOL}://${host}/oauth2callback`,
 );
 
-
 async function getEmailFromAccessToken(access_token) {
-  const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+  const resp = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
     headers: { Authorization: `Bearer ${access_token}` },
   });
-  if (!resp.ok) throw new Error('Failed to fetch userinfo: ' + resp.status);
+  if (!resp.ok) throw new Error("Failed to fetch userinfo: " + resp.status);
   const profile = await resp.json();
   // profile.email, profile.email_verified, profile.sub, profile.name, profile.picture
   return profile;
@@ -56,7 +57,7 @@ export function getOAuthClient(userID, tokens) {
   const client = new google.auth.OAuth2(
     process.env.CLIENT_ID,
     process.env.CLIENT_SECRET,
-    `${PROTOCOL}://${host}/oauth2callback`
+    `${PROTOCOL}://${host}/oauth2callback`,
   );
 
   client.setCredentials(tokens);
@@ -69,7 +70,6 @@ export function getOAuthClient(userID, tokens) {
   clients.set(userID, client);
   return client;
 }
-
 
 async function safeUpdateTokens(userID, oldTokens, newTokens) {
   const merged = { ...oldTokens };
@@ -94,10 +94,12 @@ app.get("/healthcheck", (req, res) => {
 app.get("/auth", (req, res) => {
   const url = oAuth2Client.generateAuthUrl({
     access_type: "offline",
-    prompt: "consent", 
-    scope: ["https://www.googleapis.com/auth/gmail.readonly",    
+    prompt: "consent",
+    scope: [
+      "https://www.googleapis.com/auth/gmail.readonly",
       "email",
-      "profile"],
+      "profile",
+    ],
   });
   res.redirect(url);
 });
@@ -106,42 +108,44 @@ app.get("/auth", (req, res) => {
 app.get("/oauth2callback", async (req, res) => {
   const { code } = req.query;
   const { tokens } = await oAuth2Client.getToken(code);
-  const {access_token} = tokens
-  const profile = await getEmailFromAccessToken(access_token)
-  const email = profile.email
+  const { access_token } = tokens;
+  const profile = await getEmailFromAccessToken(access_token);
+  const email = profile.email;
 
   //check user in db
-  const user  = await getUser(email)
-  if(user == null) {
-    res.send(`User is not registered.`)
-    return
+  const user = await getUser(email);
+  if (user == null) {
+    res.send(`User is not registered.`);
+    return;
   }
 
-  const auth = await getOAuthClient(user.id,tokens)
+  const auth = await getOAuthClient(user.id, tokens);
   const gmail = google.gmail({ version: "v1", auth });
 
-  const response = await gmail.users.watch({
-    userId: "me",
-    requestBody: {
-      topicName: "projects/mail-service-470611/topics/gmail-updates",
-      labelIds: ["INBOX"], 
-    },
-  }).catch((err)=> {
-    return res.send(err)
-  });
-  const data =response.data
+  const response = await gmail.users
+    .watch({
+      userId: "me",
+      requestBody: {
+        topicName: "projects/mail-service-470611/topics/gmail-updates",
+        labelIds: ["INBOX"],
+      },
+    })
+    .catch((err) => {
+      return res.send(err);
+    });
+  const data = response.data;
 
-  await updateLastHistoryId(user.id,data.historyId ?? "")
-  await updateOauthToken(user.id,tokens)
+  await updateLastHistoryId(user.id, data.historyId ?? "");
+  await updateOauthToken(user.id, tokens);
 
   // userState.set(state,tokens)
   res.send(`User ${email} authenticated successfully!`);
 });
 
 app.get("/start-watch", async (req, res) => {
-  const user = await getUser("harrontan@gmail.com")
-  const tokens = await getUserToken(user.id)
-  const auth = await createOAuthClient(user.id,tokens)
+  const user = await getUser("harrontan@gmail.com");
+  const tokens = await getUserToken(user.id);
+  const auth = await createOAuthClient(user.id, tokens);
   const gmail = google.gmail({ version: "v1", auth });
   const response = await gmail.users.watch({
     userId: "me",
@@ -153,60 +157,81 @@ app.get("/start-watch", async (req, res) => {
   res.json(response.data);
 });
 
-app.get("/startSub", async (req,res) => {
-  startServer()
-
-  res.status(200).send();
-})
-
 app.listen(port, () => {
   console.log(`Server running on ${PROTOCOL}://${host}:${port}`);
-  startServer()
+  startServer();
 });
 
-app.get("/test/send", async (req,res) => {
-  await sendUserNotification("56ab3477-86d3-4814-9ccc-7221ad1398ab", 1.5, "test notification")
+app.get("/test/send", async (req, res) => {
+  await sendUserNotification(
+    "56ab3477-86d3-4814-9ccc-7221ad1398ab",
+    1.5,
+    "test notification",
+  );
 
-  res.status(200).send()
-})
+  res.status(200).send();
+});
 
 // app.get("/test", async (req,res) => {
 // })
 
-async function sendToDb(rawDescription,user_id) {
-  
-  const userCategoriesData = await getUserCategories(user_id)
-  const categories = userCategoriesData == null 
-    ? null : 
-      userCategoriesData.length > 0 
-      ? userCategoriesData.map((d) => d.name).join() : 
-      null
-  const {amount,description,category} = await detectCategoryUsingAI(rawDescription,categories)
-  
-
-  const response = await fetch('https://doqgomabmxpcijxoliff.supabase.co/functions/v1/add-expense', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.SUPABASE_SECRET}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(
-      {
-        "user_id": user_id,
-        "amount": amount,
-        "description": description,
-        "category_name": category,
-        "date": new Date().toISOString()
+async function retryWithBackoff(fn, maxRetries = 3, delayMs = 1000) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      console.error(
+        `[retry] Attempt ${attempt}/${maxRetries} failed:`,
+        error.message,
+      );
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, delayMs * attempt)); // Exponential backoff
       }
-    ),
-  })
+    }
+  }
+  throw lastError;
+}
 
-  const data = await response.json()
-  console.log(data)
-  console.log(`Successfully added data to db!`)
+async function sendToDb(rawDescription, user_id) {
+  const userCategoriesData = await getUserCategories(user_id);
+  const categories =
+    userCategoriesData == null
+      ? null
+      : userCategoriesData.length > 0
+        ? userCategoriesData.map((d) => d.name).join()
+        : null;
 
-  await sendUserNotification(user_id,amount,description)
+  let { amount, description, category } = await retryWithBackoff(
+    async () => detectCategoryUsingAI(raswDescription, categories),
+    3,
+    1000, // 1 second delay between retries
+  );
 
+  const response = await fetch(
+    "https://doqgomabmxpcijxoliff.supabase.co/functions/v1/add-expense",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.SUPABASE_SECRET}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: user_id,
+        amount: amount,
+        description: description,
+        category_name: category,
+        date: new Date().toISOString(),
+      }),
+    },
+  );
+
+  const data = await response.json();
+  console.log(data);
+  console.log(`Successfully added data to db!`);
+
+  await sendUserNotification(user_id, amount, description);
 }
 
 function getBody(payload) {
@@ -234,22 +259,22 @@ function htmlToText(html) {
   return $("body").text().replace(/\s+/g, " ").trim(); // collapse whitespace
 }
 
-async function sendUserCustomNotification(userId,title,message) {
+async function sendUserCustomNotification(userId, title, message) {
   let { data, error } = await supabase
-    .from('push_subscriptions')
-    .select('*')
-    .eq('user_id', userId)
-  
-  if(data.length != 1) return
+    .from("push_subscriptions")
+    .select("*")
+    .eq("user_id", userId);
 
-  data = data[0]
+  if (data.length != 1) return;
+
+  data = data[0];
   const subscription = {
     endpoint: data.endpoint,
     keys: {
       p256dh: data.p256dh,
-      auth: data.auth
-    }
-  }
+      auth: data.auth,
+    },
+  };
 
   const payload = JSON.stringify({
     title: title,
@@ -258,26 +283,25 @@ async function sendUserCustomNotification(userId,title,message) {
     // url: "https://your-app.com/expenses"
   });
 
-  await sendNotification(subscription,payload)
+  await sendNotification(subscription, payload);
 }
 
-async function sendUserNotification(userId,amount,desc) {
-  
+async function sendUserNotification(userId, amount, desc) {
   let { data, error } = await supabase
-    .from('push_subscriptions')
-    .select('*')
-    .eq('user_id', userId)
-  
-  if(data.length != 1) return
+    .from("push_subscriptions")
+    .select("*")
+    .eq("user_id", userId);
 
-  data = data[0]
+  if (data.length != 1) return;
+
+  data = data[0];
   const subscription = {
     endpoint: data.endpoint,
     keys: {
       p256dh: data.p256dh,
-      auth: data.auth
-    }
-  }
+      auth: data.auth,
+    },
+  };
 
   const payload = JSON.stringify({
     title: "New Transaction",
@@ -286,11 +310,10 @@ async function sendUserNotification(userId,amount,desc) {
     // url: "https://your-app.com/expenses"
   });
 
-  await sendNotification(subscription,payload)
-
+  await sendNotification(subscription, payload);
 }
 
-async function sendNotification(subscription,payload) {
+async function sendNotification(subscription, payload) {
   try {
     await webPush.sendNotification(subscription, payload);
     console.log("✅ Push notification sent!");
@@ -299,30 +322,29 @@ async function sendNotification(subscription,payload) {
   }
 }
 
-
 async function getUser(email) {
-  if(email === "jingwenmvp@gmail.com") {
-    email = "jing_wen@live.com"
+  if (email === "jingwenmvp@gmail.com") {
+    email = "jing_wen@live.com";
   }
   const { data, error } = await supabase.auth.admin.listUsers({
     limit: 1000, // optional: max 1000 at a time
   });
-  
+
   if (error) {
-    console.error(error)
-    return null
+    console.error(error);
+    return null;
   }
 
-  const user = data.users.find(u => u.email === email);
+  const user = data.users.find((u) => u.email === email);
 
   if (!user) {
-    console.log("no user found.")
-    null
+    console.log("no user found.");
+    null;
   } else {
     return {
       id: user.id,
-      email: user.email
-    }
+      email: user.email,
+    };
   }
 }
 
@@ -342,30 +364,27 @@ async function getUserToken(userID) {
 }
 
 async function getUserTokenlist() {
-  const {data,error} = await supabase
-    .from("oauth_tokens")
-    .select("*")
+  const { data, error } = await supabase.from("oauth_tokens").select("*");
 
-  if(error) {
-    return null
+  if (error) {
+    return null;
   }
-  return data
+  return data;
 }
 
 export async function getUserCategories(userID) {
   const { data, error } = await supabase
     .from("categories")
     .select("name")
-    .eq("user_id", userID)
+    .eq("user_id", userID);
 
   if (error) {
-    console.log(error)
+    console.log(error);
     return null;
   }
 
   return data;
 }
-
 
 async function delUserToken(userID) {
   const { data, error } = await supabase
@@ -381,11 +400,9 @@ async function delUserToken(userID) {
   return data; // deleted rows
 }
 
-async function updateOauthToken(user_id,tokens) {
-  await supabase
-  .from("oauth_tokens")
-  .upsert({
-    user_id, 
+async function updateOauthToken(user_id, tokens) {
+  await supabase.from("oauth_tokens").upsert({
+    user_id,
     provider: "google",
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
@@ -401,7 +418,7 @@ async function getLastHistoryId(userID) {
     .from("last_history_id")
     .select("history_id")
     .eq("user_id", userID)
-    .single()
+    .single();
 
   if (error) {
     if (error.code === "PGRST116") return null; // no row found
@@ -409,64 +426,64 @@ async function getLastHistoryId(userID) {
   }
 
   return data.history_id;
-
 }
-async function updateLastHistoryId(user_id,history_id) {
-  await supabase
-  .from("last_history_id")
-  .upsert({
-    user_id, 
+async function updateLastHistoryId(user_id, history_id) {
+  await supabase.from("last_history_id").upsert({
+    user_id,
     history_id,
     updated_at: new Date().toISOString(),
-  }); 
+  });
 }
 
 async function validatingAuthclients() {
-  const authList = await getUserTokenlist()
-  if (authList == null) return
+  const authList = await getUserTokenlist();
+  if (authList == null) return;
 
-  for(const auth_token of authList) {
-    await getOAuthClient(auth_token.user_id, auth_token)
+  for (const auth_token of authList) {
+    await getOAuthClient(auth_token.user_id, auth_token);
   }
 }
 
 async function startServer() {
-  console.log("Starting server....")
-  const pubsub = new PubSub({ projectId: "mail-service-470611", credentials: serviceAccount });
+  console.log("Starting server....");
+  const pubsub = new PubSub({
+    projectId: "mail-service-470611",
+    credentials: serviceAccount,
+  });
   const subscription = pubsub.subscription("gmail-updates-sub");
   const processedMessageIds = new Set();
-  await validatingAuthclients()
+  await validatingAuthclients();
 
-  console.log("start subscribing!")
+  console.log("start subscribing!");
   subscription.on("message", async (msg) => {
-  
     try {
       const data = JSON.parse(msg.data.toString());
       console.log("📩 Gmail update:", data);
 
-      const user  = await getUser(data.emailAddress)
-      if(user == null) return
-      const userID = user.id
-      const tokens = await getUserToken(userID)
-      if(tokens == null) return
-      const auth = await getOAuthClient(userID,tokens)
-      
-      const gmail = google.gmail({ version: "v1", auth });
-      const lastHistoryId = await getLastHistoryId(userID)
-      if(lastHistoryId == null) return
+      const user = await getUser(data.emailAddress);
+      if (user == null) return;
+      const userID = user.id;
+      const tokens = await getUserToken(userID);
+      if (tokens == null) return;
+      const auth = await getOAuthClient(userID, tokens);
 
-      const historyRes = await gmail.users.history.list({
-        userId: 'me',
-        startHistoryId: lastHistoryId,
-      }).catch((err) => {
-        err.userID = userID;
-        throw err;
-      });
+      const gmail = google.gmail({ version: "v1", auth });
+      const lastHistoryId = await getLastHistoryId(userID);
+      if (lastHistoryId == null) return;
+
+      const historyRes = await gmail.users.history
+        .list({
+          userId: "me",
+          startHistoryId: lastHistoryId,
+        })
+        .catch((err) => {
+          err.userID = userID;
+          throw err;
+        });
       const newLastHistoryId = historyRes.data.historyId || lastHistoryId;
-      await updateLastHistoryId(userID,newLastHistoryId)
+      await updateLastHistoryId(userID, newLastHistoryId);
 
       const history = historyRes.data.history || [];
-      
 
       for (const record of history) {
         if (record.messagesAdded) {
@@ -477,7 +494,7 @@ async function startServer() {
             let message;
             try {
               message = await gmail.users.messages.get({
-                userId: 'me',
+                userId: "me",
                 id: messageId,
               });
             } catch (err) {
@@ -490,12 +507,13 @@ async function startServer() {
 
             // Only process if received AFTER we started
             if (internalDate > Date.now() - 60 * 1000) {
-            
               const rawBody = getBody(message.data.payload);
-              const cleanText = /<[^>]+>/.test(rawBody) ? htmlToText(rawBody) : rawBody;
-              if(cleanText.includes("You have received")) {
-                console.log("Skipping received case!")
-                continue
+              const cleanText = /<[^>]+>/.test(rawBody)
+                ? htmlToText(rawBody)
+                : rawBody;
+              if (cleanText.includes("You have received")) {
+                console.log("Skipping received case!");
+                continue;
               }
               const regexs = [
                 /Amount:\s*SGD\s*([\d.,]+).*?To:\s*(.*?)NETS/i, // NETS
@@ -503,36 +521,40 @@ async function startServer() {
                 /SGD\s*([\d,]+\.\d{2}).*at\s+(?:.*\s)?at\s+([^\.\n]+)\./i, // OCBC CC
                 /\+?SGD\s*([\d,]+\.\d{2}).*at\s+([^\.]+)\./i, // SC CC
                 /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+?)(?=\n|if unauthorised)/i, // DBS Paynow
-                /Transaction Amount\s+([A-Z]{3}\d+(?:\.\d+)?)\s+Description\s+(.+)/ // HSBC
-              ]
+                /Transaction Amount\s+([A-Z]{3}\d+(?:\.\d+)?)\s+Description\s+(.+)/, // HSBC
+              ];
 
-              let ind = 0
-              for(const regex of regexs) {
-                const match = cleanText.match(regex)
+              let ind = 0;
+              for (const regex of regexs) {
+                const match = cleanText.match(regex);
                 if (match) {
-                  await sendToDb(cleanText,userID)
-                  break                
+                  await sendToDb(cleanText, userID);
+                  break;
                 }
-                ind += 1
+                ind += 1;
               }
             }
           }
         }
       }
 
-      processedMessageIds.clear()
+      processedMessageIds.clear();
       msg.ack();
     } catch (err) {
       const errStr = err?.message || JSON.stringify(err);
       const knownErrors = [
         "Request had invalid authentication credentials.",
         "invalid_grant",
-        "Request had insufficient authentication scopes"
-      ]
-      if ( knownErrors.some(e => errStr.includes(e))) {
+        "Request had insufficient authentication scopes",
+      ];
+      if (knownErrors.some((e) => errStr.includes(e))) {
         await delUserToken(err.userID);
         clients.delete(err.userID);
-        await sendUserCustomNotification(err.userID, "Token Expired", "Please reauthenticate!");
+        await sendUserCustomNotification(
+          err.userID,
+          "Token Expired",
+          "Please reauthenticate!",
+        );
       } else {
         console.error("❌ Error handling message:", err);
       }
@@ -542,4 +564,4 @@ async function startServer() {
   subscription.on("error", (err) => {
     console.error("❌ Subscription error:", err);
   });
-} 
+}
