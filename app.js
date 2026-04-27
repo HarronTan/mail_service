@@ -49,8 +49,8 @@ async function getEmailFromAccessToken(access_token) {
 
 const clients = new Map();
 
-export function getOAuthClient(userID, tokens) {
-  if (clients.has(userID)) {
+export function getOAuthClient(userID, tokens, isNew) {
+  if (clients.has(userID) && !isNew) {
     return clients.get(userID);
   }
 
@@ -119,7 +119,7 @@ app.get("/oauth2callback", async (req, res) => {
     return;
   }
 
-  const auth = await getOAuthClient(user.id, tokens);
+  const auth = await getOAuthClient(user.id, tokens, true);
   const gmail = google.gmail({ version: "v1", auth });
 
   const response = await gmail.users
@@ -440,7 +440,7 @@ async function validatingAuthclients() {
   if (authList == null) return;
 
   for (const auth_token of authList) {
-    await getOAuthClient(auth_token.user_id, auth_token);
+    await getOAuthClient(auth_token.user_id, auth_token, false);
   }
 }
 
@@ -465,7 +465,7 @@ async function startServer() {
       const userID = user.id;
       const tokens = await getUserToken(userID);
       if (tokens == null) return;
-      const auth = await getOAuthClient(userID, tokens);
+      const auth = await getOAuthClient(userID, tokens, false);
 
       const gmail = google.gmail({ version: "v1", auth });
       const lastHistoryId = await getLastHistoryId(userID);
@@ -499,7 +499,7 @@ async function startServer() {
               });
             } catch (err) {
               console.error(`Error fetching message ${messageId}`);
-              console.error(JSON.stringify(err))
+              console.error(JSON.stringify(err));
               continue; // skip this message and continue with next
             }
 
