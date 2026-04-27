@@ -566,3 +566,165 @@ async function startServer() {
     console.error("❌ Subscription error:", err);
   });
 }
+
+// Homepage route
+
+app.get("/", async (req, res) => {
+  // Updated HTML content with navigation links to privacy and terms pages
+  res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Email Transaction Monitor</title>
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                h1 { color: #333; margin-bottom: 20px; }
+                p { color: #666; font-size: 1.2em; line-height: 1.6; }
+                nav { margin-top: 30px; }
+                a { color: #2c7a4d; text-decoration: none; margin: 0 15px; font-size: 1.1em; }
+                a:hover { text-decoration: underline; }
+            </style>
+        </head>
+        <body>
+            <h1>Email Transaction Monitor</h1>
+            <p>Welcome to the transaction monitoring application.</p>
+            <p>Status: Running & Monitoring...</p>
+            
+            <nav>
+                <a href="/privacy">Privacy Policy</a>
+                <a href="/terms">Terms of Service</a>
+            </nav>
+        </body>
+        </html>
+    `);
+});
+
+app.get("/privacy", async (req, res) => {
+  // Privacy policy HTML content
+  const privacyContent = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Privacy Policy - Email Transaction Monitor</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    margin: 0 auto; 
+                    padding: 50px; 
+                    max-width: 800px;
+                    color: #333;
+                }
+                h1 { color: #2c7a4d; }
+                p { line-height: 1.6; color: #555; }
+            </style>
+        </head>
+        <body>
+            <h1>Privacy Policy</h1>
+            <p>Welcome to the Email Transaction Monitor application.</p>
+            
+            <p><strong>Data Collection:</strong></p>
+            <p>We collect email data only when you have explicitly authorized our Gmail Watch subscription. This data is used solely for detecting financial transactions from supported banks (NETS, OCBC, DBS, HSBC, SC).</p>
+            
+            <p><strong>Data Usage:</strong></p>
+            <p>All transaction information is processed to categorize expenses and send push notifications. We do not store your email content beyond the current session except for logged transactions in our Supabase database.</p>
+            
+            <p><strong>Third-Party Services:</strong></p>
+            <p>We use Google Cloud API, Supabase, and Web Push services to power our transaction monitoring capabilities. These services are used only with your explicit authorization.</p>
+            
+            <p><strong>Data Security:</strong></p>
+            <p>We implement token refresh mechanisms to maintain service stability without interrupting your email monitoring. Your OAuth tokens are securely stored in Supabase.</p>
+            
+            <p><strong>Contact:</strong></p>
+            <p>For privacy concerns, please contact [CONTACT_EMAIL].</p>
+            
+            <p>Last updated: ${new Date().toLocaleDateString()}</p>
+        </body>
+        </html>
+    `;
+
+  res.send(privacyContent);
+});
+
+app.get("/terms", async (req, res) => {
+  // Terms of Service HTML content
+  const termsContent = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Terms of Service - Email Transaction Monitor</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    margin: 0 auto; 
+                    padding: 50px; 
+                    max-width: 800px;
+                    color: #333;
+                }
+                h1 { color: #2c7a4d; }
+                p { line-height: 1.6; color: #555; }
+                ul { line-height: 1.6; }
+            </style>
+        </head>
+        <body>
+            <h1>Terms of Service</h1>
+            
+            <p><strong>Acceptance of Terms:</strong></p>
+            <p>By using the Email Transaction Monitor application, you agree to be bound by these terms.</p>
+            
+            <p><strong>Authorization Requirements:</strong></p>
+            <ul>
+                <li>You must explicitly authorize our Gmail Watch subscription through Google's OAuth flow.</li>
+                <li>You are responsible for managing your authorization tokens and refresh cycles.</li>
+                <li>We will not store more than the last known history ID to avoid re-processing historical emails.</li>
+            </ul>
+            
+            <p><strong>Service Availability:</strong></p>
+            <ul>
+                <li>The application provides transaction monitoring for supported banks (NETS, OCBC, DBS, HSBC, SC).</li>
+                <li>We use token refresh mechanisms to maintain service stability and prevent interruptions.</li>
+                <li>Third-party services (Google Cloud API, Supabase, Web Push) are used only with your explicit authorization.</li>
+            </ul>
+            
+            <p><strong>Data Privacy:</strong></p>
+            <ul>
+                <li>We collect email data only when you have explicitly authorized our Gmail Watch subscription.</li>
+                <li>All transaction information is processed to categorize expenses and send push notifications.</li>
+                <li>We do not store your email content beyond the current session except for logged transactions in Supabase database.</li>
+            </ul>
+            
+            <p><strong>Token Management:</strong></p>
+            <ul>
+                <li>We implement automatic token refresh to maintain service stability.</li>
+                <li>If token refresh fails, we will notify you and request manual re-authentication.</li>
+                <li>Your OAuth tokens are securely stored in Supabase with proper authorization controls.</li>
+            </ul>
+            
+            <p><strong>Third-Party Services:</strong></p>
+            <ul>
+                <li>We use Google Cloud API, Supabase, and Web Push services to power our transaction monitoring capabilities.</li>
+                <li>These services are used only with your explicit authorization and in compliance with their terms of service.</li>
+            </ul>
+            
+            <p><strong>Data Security:</strong></p>
+            <ul>
+                <li>We implement proper token expiration handling to maintain production stability.</li>
+                <li>All Supabase queries include user_id for authorization.</li>
+                <li>Client secrets and OAuth credentials are never exposed in logs.</li>
+            </ul>
+            
+            <p><strong>Modification of Terms:</strong></p>
+            <p>We reserve the right to modify these terms at any time. Your continued use of the application constitutes acceptance of modified terms.</p>
+            
+            <p><strong>Contact Information:</strong></p>
+            <p>For terms-related concerns, please contact [CONTACT_EMAIL].</p>
+            
+            <p>Last updated: ${new Date().toLocaleDateString()}</p>
+        </body>
+        </html>
+    `;
+
+  res.send(termsContent);
+});
