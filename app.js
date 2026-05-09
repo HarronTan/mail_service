@@ -206,7 +206,7 @@ async function sendToDb(rawDescription, user_id) {
   let { amount, description, category } = await retryWithBackoff(
     async () => detectCategoryUsingAI(rawDescription, categories),
     3,
-    1000, // 1 second delay between retries
+    1000 * 60 * 3, // 3min delay between retries
   );
 
   const response = await fetch(
