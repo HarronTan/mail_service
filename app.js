@@ -577,7 +577,7 @@ app.get("/", async (req, res) => {
         <head>
             <meta name="google-site-verification" content="0FRzl8YcSmmPpkEt6uU_A-vvHsp5-PQZbj5nY0URWew" />
             <meta charset="UTF-8">
-            <title>Mail Service</title>
+            <title>FinanceTrack</title>
             <style>
                 body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
                 h1 { color: #333; margin-bottom: 20px; }
@@ -588,7 +588,7 @@ app.get("/", async (req, res) => {
             </style>
         </head>
         <body>
-            <h1>Mail Service</h1>
+            <h1>FinanceTrack</h1>
             <p>Welcome to the mail monitoring application.</p>
             <p>Status: Running & Monitoring...</p>
             
@@ -608,7 +608,7 @@ app.get("/privacy", async (req, res) => {
         <html lang="en">
         <head>
             <meta charset="UTF-8">
-            <title>Privacy Policy - Mail Service</title>
+            <title>Privacy Policy - FinanceTrack</title>
             <style>
                 body { 
                     font-family: Arial, sans-serif; 
@@ -623,7 +623,7 @@ app.get("/privacy", async (req, res) => {
         </head>
         <body>
             <h1>Privacy Policy</h1>
-            <p>Welcome to the Mail Service application.</p>
+            <p>Welcome to the FinanceTrack application.</p>
             
             <p><strong>Data Collection:</strong></p>
             <p>We collect email data only when you have explicitly authorized our Gmail Watch subscription. This data is used solely for detecting financial transactions from supported banks (NETS, OCBC, DBS, HSBC, SC).</p>
@@ -655,7 +655,7 @@ app.get("/terms", async (req, res) => {
         <html lang="en">
         <head>
             <meta charset="UTF-8">
-            <title>Terms of Service - Mail Service</title>
+            <title>Terms of Service - FinanceTrack</title>
             <style>
                 body { 
                     font-family: Arial, sans-serif; 
@@ -673,7 +673,7 @@ app.get("/terms", async (req, res) => {
             <h1>Terms of Service</h1>
             
             <p><strong>Acceptance of Terms:</strong></p>
-            <p>By using the Mail Service application, you agree to be bound by these terms.</p>
+            <p>By using the FinanceTrack application, you agree to be bound by these terms.</p>
             
             <p><strong>Authorization Requirements:</strong></p>
             <ul>
