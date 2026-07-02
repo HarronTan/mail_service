@@ -167,6 +167,7 @@ app.get("/test/send", async (req, res) => {
     "56ab3477-86d3-4814-9ccc-7221ad1398ab",
     1.5,
     "test notification",
+    "test category",
   );
 
   res.status(200).send();
@@ -231,7 +232,7 @@ async function sendToDb(rawDescription, user_id) {
   console.log(data);
   console.log(`Successfully added data to db!`);
 
-  await sendUserNotification(user_id, amount, description);
+  await sendUserNotification(user_id, amount, description, category);
 }
 
 function getBody(payload) {
@@ -286,31 +287,37 @@ async function sendUserCustomNotification(userId, title, message) {
   await sendNotification(subscription, payload);
 }
 
-async function sendUserNotification(userId, amount, desc) {
+async function sendUserNotification(userId, amount, desc, category) {
   let { data, error } = await supabase
     .from("push_subscriptions")
     .select("*")
     .eq("user_id", userId);
 
-  if (data.length != 1) return;
-
-  data = data[0];
-  const subscription = {
-    endpoint: data.endpoint,
-    keys: {
-      p256dh: data.p256dh,
-      auth: data.auth,
-    },
-  };
+  if (data.length === 0) return;
 
   const payload = JSON.stringify({
     title: "New Transaction",
-    body: `You spent ${amount} at ${desc}`,
+    body: `You spent ${amount} at ${desc} on ${category}`,
     icon: "/icons/notification.png",
     // url: "https://your-app.com/expenses"
   });
 
-  await sendNotification(subscription, payload);
+  const notificationPromises = data.map((entry) => {
+    const subscription = {
+      endpoint: entry.endpoint,
+      keys: {
+        p256dh: entry.p256dh,
+        auth: entry.auth,
+      },
+    };
+    return sendNotification(subscription, payload);
+  });
+
+  await Promise.all(notificationPromises);
+}
+
+async function cleanUpInvalidSubscription(endpoint) {
+  await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
 }
 
 async function sendNotification(subscription, payload) {
@@ -318,7 +325,18 @@ async function sendNotification(subscription, payload) {
     await webPush.sendNotification(subscription, payload);
     console.log("✅ Push notification sent!");
   } catch (err) {
-    console.error("❌ Error sending push:", err);
+    const errorType = err.type || ""; // 'expired', 'invalid-credential', etc.
+
+    // Categorize the error for better handling
+    if (errorType.includes("expired") || errorType.includes("invalid")) {
+      console.error(
+        "❌ Subscription invalid, will be cleaned up:",
+        subscription.endpoint,
+      );
+      await cleanUpInvalidSubscription(subscription.endpoint);
+    } else {
+      console.error("❌ Error sending push:", err.message);
+    }
   }
 }
 
