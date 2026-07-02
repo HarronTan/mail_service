@@ -342,7 +342,7 @@ async function sendNotification(subscription, payload) {
 
 async function getUser(email) {
   if (email === "jingwenmvp@gmail.com") {
-    email = "jing_wen@live.com";
+    email = "jing_wen@live.com.sg";
   }
   const { data, error } = await supabase.auth.admin.listUsers({
     limit: 1000, // optional: max 1000 at a time
