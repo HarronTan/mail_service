@@ -9,7 +9,6 @@ import webPush from "web-push";
 import { createClient } from "@supabase/supabase-js";
 import * as cheerio from "cheerio";
 import { detectCategoryUsingAI } from "./gemini.js";
-import PostalMime from "postal-mime";
 
 webPush.setVapidDetails(
   "mailto:you@example.com",
@@ -170,8 +169,7 @@ app.post("/email/incoming", async (req, res) => {
       });
     }
 
-    const parser = new PostalMime();
-    const email = await parser.parse(req.body);
+    const email = req.body;
 
     if (!email.to) {
       console.error(`Email malformed with no email.to`, email);
@@ -189,7 +187,7 @@ app.post("/email/incoming", async (req, res) => {
 
     const msg = email.text;
 
-    if (status === "verification" && verification_url === null) {
+    if (status === "waiting" && verification_url === null) {
       const urls = extractUrls(msg);
 
       const verificationUrl = urls.find((url) => url.includes("/mail/vf-"));
@@ -233,6 +231,9 @@ app.post("/email/incoming", async (req, res) => {
         break;
       }
     }
+
+    console.log("Email does not contain matching transctions");
+    return res.status(200);
   } catch (error) {
     console.error("Error receiving email", error);
     return res.status(401).json({
