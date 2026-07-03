@@ -9,6 +9,7 @@ import webPush from "web-push";
 import { createClient } from "@supabase/supabase-js";
 import * as cheerio from "cheerio";
 import { detectCategoryUsingAI } from "./gemini.js";
+import PostalMime from "postal-mime";
 
 webPush.setVapidDetails(
   "mailto:you@example.com",
@@ -157,6 +158,90 @@ app.get("/start-watch", async (req, res) => {
   res.json(response.data);
 });
 
+app.post("/email/incoming", async (req, res) => {
+  try {
+    // 1. Authenticate Worker
+    const auth = req.headers.authorization;
+
+    if (auth !== `Bearer ${process.env.CLOUDFARE_WORKER_SECRET}`) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized",
+      });
+    }
+
+    const parser = new PostalMime();
+    const email = await parser.parse(req.body);
+
+    if (!email.to) {
+      console.error(`Email malformed with no email.to`, email);
+      return res.status(401).json({
+        success: false,
+        error: "Email malformed with no email.to",
+      });
+    }
+    const receiverAddress = email.to[0];
+    const token = receiverAddress.address.split("@")[0];
+
+    //find user
+    const { userID, status, verification_url } =
+      await getUserByEmailToken(token);
+
+    const msg = email.text;
+
+    if (status === "verification" && verification_url === null) {
+      const urls = extractUrls(msg);
+
+      const verificationUrl = urls.find((url) => url.includes("/mail/vf-"));
+
+      if (!verificationUrl) {
+        console.error("No verification url found", msg);
+        return res.status(401).json({
+          success: false,
+          error: "No verification url found",
+        });
+      }
+
+      await updateVerificationUrl(token, verificationUrl);
+      console.log("update verification url successful.");
+      return res.status(200);
+    }
+
+    // validate message
+
+    if (!email.to) {
+      console.error(`Email malformed with no text: ${email}`);
+      return res.status(401).json({
+        success: false,
+        error: "Email malformed with no text",
+      });
+    }
+
+    const regexs = [
+      /Amount:\s*SGD\s*([\d.,]+).*?To:\s*(.*?)NETS/i, // NETS
+      /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s, // OCBC Paynow
+      /SGD\s*([\d,]+\.\d{2}).*at\s+(?:.*\s)?at\s+([^\.\n]+)\./i, // OCBC CC
+      /\+?SGD\s*([\d,]+\.\d{2}).*at\s+([^\.]+)\./i, // SC CC
+      /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+?)(?=\n|if unauthorised)/i, // DBS Paynow
+      /Transaction Amount\s+([A-Z]{3}\d+(?:\.\d+)?)\s+Description\s+(.+)/, // HSBC
+    ];
+
+    for (const regex of regexs) {
+      const match = msg.match(regex);
+      if (match) {
+        await sendToDb(msg, userID);
+        break;
+      }
+    }
+  } catch (error) {
+    console.error("Error receiving email", error);
+    return res.status(401).json({
+      success: false,
+      error: "Error receiving email",
+    });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server running on ${PROTOCOL}://${host}:${port}`);
   startServer();
@@ -172,9 +257,6 @@ app.get("/test/send", async (req, res) => {
 
   res.status(200).send();
 });
-
-// app.get("/test", async (req,res) => {
-// })
 
 async function retryWithBackoff(fn, maxRetries = 3, delayMs = 1000) {
   let lastError;
@@ -260,6 +342,10 @@ function htmlToText(html) {
   return $("body").text().replace(/\s+/g, " ").trim(); // collapse whitespace
 }
 
+function extractUrls(text) {
+  return text.match(/https?:\/\/[^\s]+/g) ?? [];
+}
+
 async function sendUserCustomNotification(userId, title, message) {
   let { data, error } = await supabase
     .from("push_subscriptions")
@@ -339,6 +425,8 @@ async function sendNotification(subscription, payload) {
     }
   }
 }
+
+//DB functions
 
 async function getUser(email) {
   if (email === "jingwenmvp@gmail.com") {
@@ -462,6 +550,32 @@ async function validatingAuthclients() {
   }
 }
 
+async function getUserByEmailToken(token) {
+  const { data, error } = await supabase
+    .from("users_email_tracking")
+    .select("*")
+    .eq("email_token", token)
+    .single();
+
+  if (error) {
+    console.error(`Failed to receive user_id by email token`, error.message);
+    throw new Error(`Failed to get user_id by email token.`);
+  }
+  return data;
+}
+
+async function updateVerificationUrl(token, verification_url) {
+  const { data, error } = await supabase
+    .from("users_email_tracking")
+    .update({ verification_url: verification_url })
+    .eq("email_token", token);
+
+  if (error) {
+    console.error("Error updating verification url: ", error.message);
+    throw new Error("Error updating verification url");
+  }
+}
+
 async function startServer() {
   console.log("Starting server....");
   const pubsub = new PubSub({
@@ -543,14 +657,12 @@ async function startServer() {
                 /Transaction Amount\s+([A-Z]{3}\d+(?:\.\d+)?)\s+Description\s+(.+)/, // HSBC
               ];
 
-              let ind = 0;
               for (const regex of regexs) {
                 const match = cleanText.match(regex);
                 if (match) {
                   await sendToDb(cleanText, userID);
                   break;
                 }
-                ind += 1;
               }
             }
           }

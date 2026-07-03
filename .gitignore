@@ -48,3 +48,6 @@ out/
 *.cache/
 
 .continue/
+
+create-token.js
+test.js
