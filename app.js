@@ -178,8 +178,22 @@ app.post("/email/incoming", async (req, res) => {
         error: "Email malformed with no email.to",
       });
     }
-    const receiverAddress = email.to[0];
-    const token = receiverAddress.address.split("@")[0];
+
+    let token;
+
+    if (email.to) {
+      token = email.token;
+    } else {
+      const receiverAddress = email.to[0];
+      token = receiverAddress.address.split("@")[0];
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: "Token not available",
+      });
+    }
 
     //find user
     const { userID, status, verification_url } =
