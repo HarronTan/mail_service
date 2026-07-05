@@ -207,7 +207,9 @@ app.post("/email/incoming", async (req, res) => {
 
     const msg = email.text;
 
-    if (status === "waiting" && verification_url === null) {
+    const pendingStatus = ["pending", "waiting"];
+
+    if (pendingStatus.includes(status) && verification_url === null) {
       const urls = extractUrls(msg);
 
       const verificationUrl = urls.find((url) => url.includes("/mail/vf-"));
