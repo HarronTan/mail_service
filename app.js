@@ -195,13 +195,13 @@ app.post("/email/incoming", async (req, res) => {
       });
     }
 
-    console.log("Received token: ", token)
+    console.log("Received token: ", token);
 
     //find user
-    const { userID, status, verification_url } =
+    const { user_id, status, verification_url } =
       await getUserByEmailToken(token);
 
-    console.log("user found: ", userID)
+    console.log("user found: ", user_id);
 
     const msg = email.text;
 
@@ -245,7 +245,7 @@ app.post("/email/incoming", async (req, res) => {
     for (const regex of regexs) {
       const match = msg.match(regex);
       if (match) {
-        await sendToDb(msg, userID);
+        await sendToDb(msg, user_id);
         break;
       }
     }
@@ -263,7 +263,7 @@ app.post("/email/incoming", async (req, res) => {
 
 app.listen(port, () => {
   console.log(`Server running on ${PROTOCOL}://${host}:${port}`);
-  startServer();
+  // startServer();
 });
 
 app.get("/test/send", async (req, res) => {
@@ -276,6 +276,17 @@ app.get("/test/send", async (req, res) => {
 
   res.status(200).send();
 });
+
+// app.get("/users/:token", async (req, res) => {
+//   const { token } = req.params;
+//   console.log(token);
+//   const { user_id } = await getUserByEmailToken(token);
+//   console.log(user_id);
+//   res.json({
+//     message: "User fetched successfully",
+//     user_id,
+//   });
+// });
 
 async function retryWithBackoff(fn, maxRetries = 3, delayMs = 1000) {
   let lastError;
@@ -331,9 +342,9 @@ async function sendToDb(rawDescription, user_id) {
 
   if (!response.ok) {
     const error = await response.text();
-    console.error("unable to fetch add-expense")
-    console.error(error)
-    throw new Error(error)
+    console.error("unable to fetch add-expense");
+    console.error(error);
+    throw new Error(error);
   }
 
   const data = await response.json();
