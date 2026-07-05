@@ -181,7 +181,7 @@ app.post("/email/incoming", async (req, res) => {
 
     let token;
 
-    if (email.to) {
+    if (email.token) {
       token = email.token;
     } else {
       const receiverAddress = email.to[0];
@@ -194,6 +194,8 @@ app.post("/email/incoming", async (req, res) => {
         error: "Token not available",
       });
     }
+
+    console.log("Received token: ", token)
 
     //find user
     const { userID, status, verification_url } =
