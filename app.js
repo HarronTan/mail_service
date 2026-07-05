@@ -201,6 +201,8 @@ app.post("/email/incoming", async (req, res) => {
     const { userID, status, verification_url } =
       await getUserByEmailToken(token);
 
+    console.log("user found: ", userID)
+
     const msg = email.text;
 
     if (status === "waiting" && verification_url === null) {
@@ -326,6 +328,13 @@ async function sendToDb(rawDescription, user_id) {
       }),
     },
   );
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("unable to fetch add-expense")
+    console.error(error)
+    throw new Error(error)
+  }
 
   const data = await response.json();
   console.log(data);
