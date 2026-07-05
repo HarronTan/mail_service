@@ -202,6 +202,8 @@ app.post("/email/incoming", async (req, res) => {
       await getUserByEmailToken(token);
 
     console.log("user found: ", user_id);
+    console.log(status);
+    console.log(verification_url);
 
     const msg = email.text;
 
