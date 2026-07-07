@@ -170,7 +170,7 @@ app.post("/email/incoming", async (req, res) => {
     }
 
     const email = req.body;
-
+    console.log("email received:", email)
     if (!email.to) {
       console.error(`Email malformed with no email.to`, email);
       return res.status(401).json({
@@ -267,7 +267,7 @@ app.post("/email/incoming", async (req, res) => {
 
 app.listen(port, () => {
   console.log(`Server running on ${PROTOCOL}://${host}:${port}`);
-  // startServer();
+  startServer();
 });
 
 app.get("/test/send", async (req, res) => {
