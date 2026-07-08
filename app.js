@@ -170,7 +170,7 @@ app.post("/email/incoming", async (req, res) => {
     }
 
     const email = req.body;
-    console.log("email received:", email)
+    console.log("email received:", email);
     if (!email.to) {
       console.error(`Email malformed with no email.to`, email);
       return res.status(401).json({
@@ -229,12 +229,12 @@ app.post("/email/incoming", async (req, res) => {
 
     // validate message
 
-    if (!email.to) {
-      console.error(`Email malformed with no text: ${email}`);
-      return res.status(401).json({
-        success: false,
-        error: "Email malformed with no text",
-      });
+    let textMsg;
+
+    if (email.text && email.text != "") {
+      textMsg = email.text;
+    } else {
+      textMsg = htmlToText(email.html);
     }
 
     const regexs = [
@@ -380,7 +380,13 @@ function getBody(payload) {
 
 function htmlToText(html) {
   const $ = cheerio.load(html);
-  return $("body").text().replace(/\s+/g, " ").trim(); // collapse whitespace
+
+  return $("body")
+    .text()
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
 }
 
 function extractUrls(text) {
