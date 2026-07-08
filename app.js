@@ -247,7 +247,7 @@ app.post("/email/incoming", async (req, res) => {
     ];
 
     for (const regex of regexs) {
-      const match = msg.match(regex);
+      const match = textMsg.match(regex);
       if (match) {
         await sendToDb(msg, user_id);
         break;
