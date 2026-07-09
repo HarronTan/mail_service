@@ -202,8 +202,6 @@ app.post("/email/incoming", async (req, res) => {
       await getUserByEmailToken(token);
 
     console.log("user found: ", user_id);
-    console.log(status);
-    console.log(verification_url);
 
     const msg = email.text;
 
@@ -236,6 +234,9 @@ app.post("/email/incoming", async (req, res) => {
     } else {
       textMsg = htmlToText(email.html);
     }
+
+    console.log("text Message after parsing html");
+    console.log(textMsg);
 
     const regexs = [
       /Amount:\s*SGD\s*([\d.,]+).*?To:\s*(.*?)NETS/i, // NETS
