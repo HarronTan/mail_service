@@ -9,6 +9,7 @@ import webPush from "web-push";
 import { createClient } from "@supabase/supabase-js";
 import * as cheerio from "cheerio";
 import { detectCategoryUsingAI } from "./gemini.js";
+import { convert } from "html-to-text";
 
 webPush.setVapidDetails(
   "mailto:you@example.com",
@@ -380,14 +381,13 @@ function getBody(payload) {
 }
 
 function htmlToText(html) {
-  const $ = cheerio.load(html);
-
-  return $("body")
-    .text()
-    .split("\n")
-    .map((line) => line.replace(/[ \t]+/g, " ").trim())
-    .filter(Boolean)
-    .join("\n");
+  return convert(html, {
+    wordwrap: false,
+    selectors: [
+      { selector: "a", options: { hideLinkHrefIfSameAsText: true } },
+      { selector: "img", format: "skip" },
+    ],
+  });
 }
 
 function extractUrls(text) {
