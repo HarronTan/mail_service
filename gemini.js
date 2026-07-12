@@ -25,6 +25,11 @@ export async function detectCategoryUsingAI(description, categories) {
   "${categories}"
 
   Text: "${description}"
+
+  Fallback rules:
+  If the input text provided is not a transaction that is made 
+  OR if the output amount or description is undefined, 
+  return a plain string stating the reason.
   `,
   });
 
@@ -38,6 +43,8 @@ export async function detectCategoryUsingAI(description, categories) {
     // Fallback if the response includes text around the JSON
     const match = text.match(/\{[\s\S]*\}/);
     if (match) json = JSON.parse(match[0]);
+    console.log("AI ouput:")
+    console.log(text)
     else throw new Error("No JSON found in response");
   }
 
