@@ -269,6 +269,7 @@ app.post("/email/incoming", async (req, res) => {
 
 app.listen(port, () => {
   console.log(`Server running on ${PROTOCOL}://${host}:${port}`);
+
   startServer();
 });
 
@@ -383,6 +384,7 @@ function getBody(payload) {
 function htmlToText(html) {
   return convert(html, {
     wordwrap: false,
+    tables: true,
     selectors: [
       { selector: "a", options: { hideLinkHrefIfSameAsText: true } },
       { selector: "img", format: "skip" },
