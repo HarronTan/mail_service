@@ -43,8 +43,8 @@ export async function detectCategoryUsingAI(description, categories) {
     // Fallback if the response includes text around the JSON
     const match = text.match(/\{[\s\S]*\}/);
     if (match) json = JSON.parse(match[0]);
-    console.log("AI ouput:")
-    console.log(text)
+    console.log("AI ouput:");
+    console.log(text);
     else throw new Error("No JSON found in response");
   }
 
