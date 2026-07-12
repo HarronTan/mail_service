@@ -329,6 +329,12 @@ async function sendToDb(rawDescription, user_id) {
     1000 * 60 * 3, // 3min delay between retries
   );
 
+  if (!amount || !category) {
+    throw new Error(
+      "detectCategoryUsingAI returned amount or category is undefined",
+    );
+  }
+
   const response = await fetch(
     "https://doqgomabmxpcijxoliff.supabase.co/functions/v1/add-expense",
     {
