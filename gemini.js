@@ -34,15 +34,15 @@ export async function detectCategoryUsingAI(description, categories) {
   });
 
   let text = result.text.trim();
-
+  console.log("AI output");
+  console.log(text);
   // Try to parse JSON directly
   let json;
   try {
     json = JSON.parse(text);
   } catch (e) {
     // Fallback if the response includes text around the JSON
-    console.log("AI output");
-    console.log(result);
+
     const match = text.match(/\{[\s\S]*\}/);
     if (match) json = JSON.parse(match[0]);
 
