@@ -329,7 +329,11 @@ async function sendToDb(rawDescription, user_id) {
     1000 * 60 * 3, // 3min delay between retries
   );
 
-  if (!amount || !category) {
+  console.log("debugging:")
+  console.log(amount)
+  console.log(description)
+
+  if (!amount || !description) {
     throw new Error(
       "detectCategoryUsingAI returned amount or category is undefined",
     );
