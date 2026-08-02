@@ -6,7 +6,7 @@ const ai = new GoogleGenAI({
 
 export async function detectCategoryUsingAI(description, categories) {
   const result = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-2.5-flash-lite",
     contents: `
   You are an expense extraction and categorization assistant.
   Given a raw text describing a transaction, extract the amount, description. 
