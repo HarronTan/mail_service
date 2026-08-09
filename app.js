@@ -370,7 +370,7 @@ async function sendToDb(rawDescription, user_id) {
         ? userCategoriesData.map((d) => d.name).join()
         : null;
 
-  let { amount, description, category, card_number_last4 } =
+  let { amount, description, category, card_number_last4, paymentMode } =
     await retryWithBackoff(
       async () => detectCategoryUsingAI(rawDescription, categories),
       3,
@@ -381,6 +381,7 @@ async function sendToDb(rawDescription, user_id) {
   console.log(amount);
   console.log(description);
   console.log(card_number_last4);
+  console.log(paymentMode);
 
   const credit_card_id = await getCardIdFromLast4(card_number_last4, user_id);
 
@@ -405,6 +406,7 @@ async function sendToDb(rawDescription, user_id) {
         category_name: category,
         date: new Date().toISOString(),
         credit_card_id: credit_card_id,
+        payment_mode: paymentMode,
       }),
     },
   );
