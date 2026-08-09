@@ -244,7 +244,7 @@ app.post("/email/incoming", async (req, res) => {
       /made to\s+(.+?)\s+using.*?Amount\s*:\s*SGD\s*([\d,]+\.\d{2})/s, // OCBC Paynow
       /SGD\s*([\d,]+\.\d{2}).*at\s+(?:.*\s)?at\s+([^\.\n]+)\./i, // OCBC CC
       /\+?SGD\s*([\d,]+\.\d{2}).*at\s+([^\.]+)\./i, // SC CC
-      /Amount\s*:?\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:?\s*([^\n]+?)(?=\n|if unauthorised)/i, // DBS Paynow
+      /Amount\s*:??\s*SGD\s*([\d,]+\.\d{2})[\s\S]*?To\s*:??\s*([^\n]+?)(?=\n|if unauthorised)/i, // DBS Paynow
       /Transaction Amount\s+([A-Z]{3}\d+(?:\.\d+)?)\s+Description\s+(.+)/, // HSBC
     ];
 
@@ -270,7 +270,7 @@ app.post("/email/incoming", async (req, res) => {
 app.listen(port, () => {
   console.log(`Server running on ${PROTOCOL}://${host}:${port}`);
 
-  startServer();
+  // startServer();
 });
 
 app.get("/test/send", async (req, res) => {
@@ -314,6 +314,53 @@ async function retryWithBackoff(fn, maxRetries = 3, delayMs = 1000) {
   throw lastError;
 }
 
+async function getCardIdFromLast4(cardNumberLast4, userID) {
+  if (!cardNumberLast4 || !userID) return null;
+
+  const normalizedLast4 = String(cardNumberLast4).trim();
+
+  if (!normalizedLast4 || normalizedLast4 === "bank_transfer") {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("credit_cards")
+    .select("id")
+    .eq("user_id", userID)
+    .eq("card_number_last4", normalizedLast4)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching card by last4:", error);
+    return null;
+  }
+
+  if (data?.id) {
+    return data.id;
+  }
+
+  const { data: insertedData, error: insertError } = await supabase
+    .from("credit_cards")
+    .insert({
+      user_id: userID,
+      card_number_last4: normalizedLast4,
+      name: `Card ending in ${normalizedLast4}`,
+      bank_name: null,
+      card_type: null,
+      color: null,
+      created_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (insertError) {
+    console.error("Error creating card entry:", insertError);
+    return null;
+  }
+
+  return insertedData?.id ?? null;
+}
+
 async function sendToDb(rawDescription, user_id) {
   const userCategoriesData = await getUserCategories(user_id);
   const categories =
@@ -323,15 +370,19 @@ async function sendToDb(rawDescription, user_id) {
         ? userCategoriesData.map((d) => d.name).join()
         : null;
 
-  let { amount, description, category } = await retryWithBackoff(
-    async () => detectCategoryUsingAI(rawDescription, categories),
-    3,
-    1000 * 60 * 3, // 3min delay between retries
-  );
+  let { amount, description, category, card_number_last4 } =
+    await retryWithBackoff(
+      async () => detectCategoryUsingAI(rawDescription, categories),
+      3,
+      1000 * 60 * 3, // 3min delay between retries
+    );
 
-  console.log("debugging:")
-  console.log(amount)
-  console.log(description)
+  console.log("debugging:");
+  console.log(amount);
+  console.log(description);
+  console.log(card_number_last4);
+
+  const credit_card_id = await getCardIdFromLast4(card_number_last4, user_id);
 
   if (!amount || !description) {
     throw new Error(
@@ -353,6 +404,7 @@ async function sendToDb(rawDescription, user_id) {
         description: description,
         category_name: category,
         date: new Date().toISOString(),
+        credit_card_id: credit_card_id,
       }),
     },
   );
